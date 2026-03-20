@@ -23,6 +23,10 @@ repositories {
 	mavenCentral()
 }
 
+springBoot {
+	mainClass = 'depth.finvibe.FinvibeApplication'
+}
+
 sourceSets {
 	main {
 		java {

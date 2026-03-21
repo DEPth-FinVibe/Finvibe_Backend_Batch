@@ -18,8 +18,6 @@ import depth.finvibe.modules.market.infra.scheduler.BatchPriceUpdateScheduler;
 import depth.finvibe.modules.market.infra.scheduler.ClosingPriceCleanupScheduler;
 import depth.finvibe.modules.market.infra.scheduler.HolidayCalendarScheduler;
 import depth.finvibe.modules.market.infra.scheduler.IndexMinuteCandleCacheScheduler;
-import depth.finvibe.modules.market.infra.scheduler.KisSubscriptionSynchronizer;
-import depth.finvibe.modules.market.infra.scheduler.StaleCurrentPriceRecoveryScheduler;
 import depth.finvibe.modules.market.infra.scheduler.StockBulkUpsertScheduler;
 import depth.finvibe.modules.market.infra.scheduler.StockRankingUpdateScheduler;
 import depth.finvibe.modules.news.infra.scheduler.NewsModuleScheduler;
@@ -168,20 +166,6 @@ public class TaskletBatchJobConfig {
 	}
 
 	@Bean
-	Job syncRealtimeSubscriptionsJob(
-		JobRepository jobRepository,
-		PlatformTransactionManager transactionManager,
-		KisSubscriptionSynchronizer kisSubscriptionSynchronizer
-	) {
-		return taskletJob(
-			"syncRealtimeSubscriptionsJob",
-			jobRepository,
-			transactionManager,
-			kisSubscriptionSynchronizer::syncRealtimeSubscriptions
-		);
-	}
-
-	@Bean
 	Job ensureNextMonthHolidayCalendarJob(
 		JobRepository jobRepository,
 		PlatformTransactionManager transactionManager,
@@ -192,20 +176,6 @@ public class TaskletBatchJobConfig {
 			jobRepository,
 			transactionManager,
 			holidayCalendarScheduler::ensureNextMonthHolidayCalendar
-		);
-	}
-
-	@Bean
-	Job recoverStaleCurrentPricesJob(
-		JobRepository jobRepository,
-		PlatformTransactionManager transactionManager,
-		StaleCurrentPriceRecoveryScheduler staleCurrentPriceRecoveryScheduler
-	) {
-		return taskletJob(
-			"recoverStaleCurrentPricesJob",
-			jobRepository,
-			transactionManager,
-			staleCurrentPriceRecoveryScheduler::recoverStaleCurrentPrices
 		);
 	}
 

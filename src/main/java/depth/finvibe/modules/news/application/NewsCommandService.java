@@ -1,0 +1,136 @@
+package depth.finvibe.modules.news.application;
+
+import depth.finvibe.modules.news.application.port.in.NewsCommandUseCase;
+import depth.finvibe.modules.news.application.port.out.NewsAiAnalyzer;
+import depth.finvibe.modules.news.application.port.out.NewsDiscussionPort;
+import depth.finvibe.modules.news.application.port.out.NewsCrawler;
+import depth.finvibe.modules.news.application.port.out.NewsRepository;
+import depth.finvibe.modules.news.application.port.out.CategoryCatalogPort;
+import depth.finvibe.modules.news.domain.News;
+import depth.finvibe.common.insight.domain.CategoryInfo;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
+import org.jsoup.Jsoup;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class NewsCommandService implements NewsCommandUseCase {
+
+    private static final Long DEFAULT_CATEGORY_ID = 4L;
+    private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
+    private static final String DEFAULT_PROVIDER = "NAVER";
+
+    private final NewsRepository newsRepository;
+    private final NewsCrawler newsCrawler;
+    private final NewsAiAnalyzer newsAiAnalyzer;
+    private final NewsDiscussionPort newsDiscussionPort;
+    private final CategoryCatalogPort categoryCatalogPort;
+    private final MeterRegistry meterRegistry;
+
+    @Override
+    public void syncLatestNews() {
+        List<NewsCrawler.RawNewsData> rawDataList = newsCrawler.fetchLatestRawNews();
+        List<CategoryInfo> categories = categoryCatalogPort.getAll();
+        if (categories.isEmpty()) {
+            throw new IllegalStateException("No categories available from market catalog");
+        }
+        CategoryInfo defaultCategory = resolveDefaultCategory(categories);
+
+        for (NewsCrawler.RawNewsData rawData : rawDataList) {
+            if (newsRepository.existsByTitle(rawData.title())) {
+                continue;
+            }
+
+            String contentText = resolveAnalysisText(rawData);
+            String analysisInput = "제목: " + rawData.title() + "\n요약: " + contentText;
+            Timer.Sample sample = Timer.start(meterRegistry);
+            NewsAiAnalyzer.AnalysisResult analysis = newsAiAnalyzer.analyze(analysisInput, categories);
+            sample.stop(Timer.builder("news.ai.analysis.duration")
+                    .description("뉴스 AI 분석 소요 시간")
+                    .tag("provider", providerOf(rawData.provider()))
+                    .register(meterRegistry));
+            CategoryInfo category = resolveCategory(analysis.categoryId(), categories, defaultCategory);
+
+            LocalDateTime publishedAt = rawData.publishedAt() != null
+                    ? rawData.publishedAt()
+                    : LocalDateTime.now(KST_ZONE);
+            String provider = (rawData.provider() == null || rawData.provider().isBlank())
+                    ? DEFAULT_PROVIDER
+                    : rawData.provider();
+
+            News news = News.create(
+                    rawData.title(),
+                    rawData.contentHtml(),
+                    contentText,
+                    analysis.summary(),
+                    analysis.signal(),
+                    analysis.keyword(),
+                    category.id(),
+                    category.name(),
+                    publishedAt,
+                    provider);
+
+            newsRepository.save(news);
+        }
+    }
+
+    @Override
+    public void syncAllDiscussionCounts() {
+        List<News> allNews = newsRepository.findAll();
+        List<Long> newsIds = allNews.stream().map(News::getId).toList();
+
+        // 벌크로 토론 수 조회 (네트워크 호출 최소화)
+        java.util.Map<Long, Long> countsMap = newsDiscussionPort.getDiscussionCounts(newsIds);
+
+        for (News news : allNews) {
+            long currentCount = countsMap.getOrDefault(news.getId(), 0L);
+
+            if (news.getDiscussionCount() != currentCount) {
+                news.syncDiscussionCount(currentCount);
+                newsRepository.save(news);
+            }
+        }
+    }
+
+    private CategoryInfo resolveDefaultCategory(List<CategoryInfo> categories) {
+        return categories.stream()
+                .filter(category -> DEFAULT_CATEGORY_ID.equals(category.id()))
+                .findFirst()
+                .orElse(categories.get(0));
+    }
+
+    private CategoryInfo resolveCategory(Long categoryId, List<CategoryInfo> categories, CategoryInfo fallback) {
+        if (categoryId == null) {
+            return fallback;
+        }
+        return categories.stream()
+                .filter(category -> category.id().equals(categoryId))
+                .findFirst()
+                .orElse(fallback);
+    }
+
+    private String resolveAnalysisText(NewsCrawler.RawNewsData rawData) {
+        if (rawData.contentText() != null && !rawData.contentText().isBlank()) {
+            return rawData.contentText();
+        }
+        if (rawData.contentHtml() != null && !rawData.contentHtml().isBlank()) {
+            return Jsoup.parse(rawData.contentHtml()).text();
+        }
+        return "";
+    }
+
+    private String providerOf(String provider) {
+        if (provider == null || provider.isBlank()) {
+            return DEFAULT_PROVIDER.toLowerCase();
+        }
+        return provider.toLowerCase();
+    }
+}

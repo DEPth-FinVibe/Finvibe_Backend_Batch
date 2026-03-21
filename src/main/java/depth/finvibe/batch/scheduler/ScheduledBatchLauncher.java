@@ -35,12 +35,8 @@ public class ScheduledBatchLauncher {
 	private final Job executeBatchPriceUpdateJob;
 	@Qualifier("cacheIndexMinuteCandlesJob")
 	private final Job cacheIndexMinuteCandlesJob;
-	@Qualifier("syncRealtimeSubscriptionsJob")
-	private final Job syncRealtimeSubscriptionsJob;
 	@Qualifier("ensureNextMonthHolidayCalendarJob")
 	private final Job ensureNextMonthHolidayCalendarJob;
-	@Qualifier("recoverStaleCurrentPricesJob")
-	private final Job recoverStaleCurrentPricesJob;
 	@Qualifier("executeStockRankingUpdateJob")
 	private final Job executeStockRankingUpdateJob;
 	@Qualifier("executeStockBulkUpsertJob")
@@ -114,21 +110,10 @@ public class ScheduledBatchLauncher {
 		scheduledBatchJobSupport.launch(cacheIndexMinuteCandlesJob);
 	}
 
-	@Scheduled(fixedDelayString = "${market.kis.websocket.sync-interval-ms:1000}")
-	public void syncRealtimeSubscriptions() {
-		scheduledBatchJobSupport.launch(syncRealtimeSubscriptionsJob);
-	}
-
 	@Scheduled(cron = "0 0 2 1 * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "holidayCalendarScheduler", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
 	public void ensureNextMonthHolidayCalendar() {
 		scheduledBatchJobSupport.launch(ensureNextMonthHolidayCalendarJob);
-	}
-
-	@Scheduled(fixedDelayString = "${market.current-price.stale-recovery.interval-ms:3000}")
-	@SchedulerLock(name = "staleCurrentPriceRecovery", lockAtMostFor = "PT30S", lockAtLeastFor = "PT1S")
-	public void recoverStaleCurrentPrices() {
-		scheduledBatchJobSupport.launch(recoverStaleCurrentPricesJob);
 	}
 
 	@Scheduled(cron = "0 */10 * * * *")

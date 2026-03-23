@@ -13,6 +13,10 @@ import lombok.experimental.SuperBuilder;
 import depth.finvibe.common.gamification.domain.TimeStampedBaseEntity;
 
 @Entity
+@Table(indexes = {
+    @Index(name = "idx_user_xp_weekly_xp", columnList = "weekly_xp"),
+    @Index(name = "idx_user_xp_total_xp", columnList = "total_xp")
+})
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SuperBuilder

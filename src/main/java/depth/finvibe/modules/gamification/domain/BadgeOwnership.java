@@ -14,6 +14,9 @@ import depth.finvibe.modules.gamification.domain.idclass.BadgeOwnershipId;
 import depth.finvibe.common.gamification.domain.TimeStampedBaseEntity;
 
 @Entity
+@Table(indexes = {
+    @Index(name = "idx_badge_ownership_owner_id", columnList = "owner_id")
+})
 @IdClass(BadgeOwnershipId.class)
 @AllArgsConstructor(staticName = "of")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

@@ -4,8 +4,6 @@ import depth.finvibe.modules.gamification.application.port.in.BadgeCommandUseCas
 import depth.finvibe.modules.gamification.application.port.out.BadgeOwnershipRepository;
 import depth.finvibe.modules.gamification.domain.BadgeOwnership;
 import depth.finvibe.modules.gamification.domain.enums.Badge;
-import depth.finvibe.modules.gamification.domain.error.GamificationErrorCode;
-import depth.finvibe.common.error.DomainException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,14 +21,10 @@ public class BadgeService implements BadgeCommandUseCase {
     public void grantBadgeToUser(UUID userId, Badge badge) {
         BadgeOwnership toSave = BadgeOwnership.of(badge, userId);
 
-        checkBadgeIsAlreadyExist(toSave);
+        if (badgeOwnershipRepository.isExist(toSave)) {
+            return;
+        }
 
         badgeOwnershipRepository.save(toSave);
-    }
-
-    private void checkBadgeIsAlreadyExist(BadgeOwnership toSave) {
-        if(badgeOwnershipRepository.isExist(toSave)) {
-            throw new DomainException(GamificationErrorCode.BADGE_ALREADY_EXIST);
-        }
     }
 }

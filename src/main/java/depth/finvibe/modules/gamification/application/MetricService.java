@@ -3,6 +3,8 @@ package depth.finvibe.modules.gamification.application;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
@@ -12,9 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.gamification.application.port.in.BadgeCommandUseCase;
 import depth.finvibe.modules.gamification.application.port.in.MetricCommandUseCase;
-import depth.finvibe.modules.gamification.application.port.out.BadgeOwnershipRepository;
 import depth.finvibe.modules.gamification.application.port.out.MetricRepository;
-import depth.finvibe.modules.gamification.domain.BadgeOwnership;
 import depth.finvibe.modules.gamification.domain.UserMetric;
 import depth.finvibe.modules.gamification.domain.enums.CollectPeriod;
 import depth.finvibe.modules.gamification.domain.enums.Badge;
@@ -34,7 +34,6 @@ public class MetricService implements MetricCommandUseCase {
     private static final double CHALLENGE_MARATHONER_TARGET = 10.0;
 
     private final MetricRepository metricRepository;
-    private final BadgeOwnershipRepository badgeOwnershipRepository;
     private final BadgeCommandUseCase badgeCommandUseCase;
 
     @Override
@@ -59,9 +58,10 @@ public class MetricService implements MetricCommandUseCase {
         }
 
         double increase = delta == null ? 0.0 : delta;
-        double updatedValue = getMetricValue(userId, metricType, CollectPeriod.ALLTIME) + increase;
+        Map<CollectPeriod, UserMetric> metricsByPeriod = metricRepository.findByUserIdAndTypeAcrossPeriods(userId, metricType);
+        double updatedValue = getMetricValue(metricsByPeriod.get(CollectPeriod.ALLTIME)) + increase;
         saveMetric(userId, metricType, CollectPeriod.ALLTIME, updatedValue);
-        updateWeeklyMetric(userId, metricType, increase);
+        updateWeeklyMetric(userId, metricType, increase, metricsByPeriod);
         evaluateBadgeByMetric(userId, metricType, updatedValue);
     }
 
@@ -77,7 +77,11 @@ public class MetricService implements MetricCommandUseCase {
         }
 
         LocalDate currentDate = occurredAt.atZone(DEFAULT_ZONE).toLocalDate();
-        LocalDate lastLoginDate = getLastLoginDate(userId);
+        Map<UserMetricType, UserMetric> loginMetrics = metricRepository.findByUserIdAndCollectPeriodAndTypes(
+                userId,
+                CollectPeriod.ALLTIME,
+                List.of(UserMetricType.LAST_LOGIN_DATETIME, UserMetricType.LOGIN_STREAK_DAYS));
+        LocalDate lastLoginDate = toLoginDate(loginMetrics.get(UserMetricType.LAST_LOGIN_DATETIME));
 
         saveMetric(userId, UserMetricType.LAST_LOGIN_DATETIME, CollectPeriod.ALLTIME, (double) occurredAt.toEpochMilli());
 
@@ -85,7 +89,7 @@ public class MetricService implements MetricCommandUseCase {
             return;
         }
 
-        double currentStreak = getMetricValue(userId, UserMetricType.LOGIN_STREAK_DAYS, CollectPeriod.ALLTIME);
+        double currentStreak = getMetricValue(loginMetrics.get(UserMetricType.LOGIN_STREAK_DAYS));
         double nextStreak = 1.0;
         if (lastLoginDate != null && lastLoginDate.plusDays(1).isEqual(currentDate)) {
             nextStreak = currentStreak + 1.0;
@@ -95,26 +99,27 @@ public class MetricService implements MetricCommandUseCase {
         evaluateBadgeByMetric(userId, UserMetricType.LOGIN_STREAK_DAYS, nextStreak);
     }
 
-    private LocalDate getLastLoginDate(UUID userId) {
-        return metricRepository.findByUserIdAndType(userId, UserMetricType.LAST_LOGIN_DATETIME, CollectPeriod.ALLTIME)
-                .map(UserMetric::getValue)
-                .filter(value -> value != null)
-                .map(value -> Instant.ofEpochMilli(value.longValue()).atZone(DEFAULT_ZONE).toLocalDate())
-                .orElse(null);
+    private LocalDate toLoginDate(UserMetric lastLoginMetric) {
+        if (lastLoginMetric == null || lastLoginMetric.getValue() == null) {
+            return null;
+        }
+        return Instant.ofEpochMilli(lastLoginMetric.getValue().longValue()).atZone(DEFAULT_ZONE).toLocalDate();
     }
 
-    private double getMetricValue(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod) {
-        return metricRepository.findByUserIdAndType(userId, metricType, collectPeriod)
-                .map(UserMetric::getValue)
-                .orElse(0.0);
+    private double getMetricValue(UserMetric userMetric) {
+        return userMetric != null && userMetric.getValue() != null ? userMetric.getValue() : 0.0;
     }
 
-    private void updateWeeklyMetric(UUID userId, UserMetricType metricType, double increase) {
+    private void updateWeeklyMetric(
+            UUID userId,
+            UserMetricType metricType,
+            double increase,
+            Map<CollectPeriod, UserMetric> metricsByPeriod) {
         if (!isWeeklyMetric(metricType) || increase == 0.0) {
             return;
         }
 
-        double updatedValue = getMetricValue(userId, metricType, CollectPeriod.WEEKLY) + increase;
+        double updatedValue = getMetricValue(metricsByPeriod.get(CollectPeriod.WEEKLY)) + increase;
         metricRepository.save(UserMetric.builder()
                 .userId(userId)
                 .type(metricType)
@@ -161,10 +166,6 @@ public class MetricService implements MetricCommandUseCase {
     }
 
     private void grantBadgeIfAbsent(UUID userId, Badge badge) {
-        BadgeOwnership ownership = BadgeOwnership.of(badge, userId);
-        if (badgeOwnershipRepository.isExist(ownership)) {
-            return;
-        }
         badgeCommandUseCase.grantBadgeToUser(userId, badge);
     }
 }

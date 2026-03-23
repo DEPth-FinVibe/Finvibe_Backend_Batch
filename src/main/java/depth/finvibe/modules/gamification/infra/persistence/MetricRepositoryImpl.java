@@ -1,8 +1,11 @@
 package depth.finvibe.modules.gamification.infra.persistence;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +42,25 @@ public class MetricRepositoryImpl implements MetricRepository {
     @Override
     public Optional<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type, CollectPeriod collectPeriod) {
         return metricJpaRepository.findByUserIdAndTypeAndCollectPeriod(userId, type, collectPeriod);
+    }
+
+    @Override
+    public Map<UserMetricType, UserMetric> findByUserIdAndCollectPeriodAndTypes(
+            UUID userId,
+            CollectPeriod collectPeriod,
+            List<UserMetricType> metricTypes) {
+        if (metricTypes == null || metricTypes.isEmpty()) {
+            return Map.of();
+        }
+
+        return metricJpaRepository.findByUserIdAndCollectPeriodAndTypeIn(userId, collectPeriod, metricTypes).stream()
+                .collect(Collectors.toMap(UserMetric::getType, Function.identity()));
+    }
+
+    @Override
+    public Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(UUID userId, UserMetricType metricType) {
+        return metricJpaRepository.findByUserIdAndType(userId, metricType).stream()
+                .collect(Collectors.toMap(UserMetric::getCollectPeriod, Function.identity()));
     }
 
     @Override

@@ -25,5 +25,12 @@ public interface MetricJpaRepository extends JpaRepository<UserMetric, UserMetri
 
     Optional<UserMetric> findByUserIdAndTypeAndCollectPeriod(UUID userId, UserMetricType type, CollectPeriod collectPeriod);
 
+    List<UserMetric> findByUserIdAndCollectPeriodAndTypeIn(
+            UUID userId,
+            CollectPeriod collectPeriod,
+            List<UserMetricType> types);
+
+    List<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type);
+
     void deleteByCollectPeriod(CollectPeriod collectPeriod);
 }

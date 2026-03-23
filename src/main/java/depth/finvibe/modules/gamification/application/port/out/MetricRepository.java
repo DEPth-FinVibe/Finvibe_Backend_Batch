@@ -1,6 +1,7 @@
 package depth.finvibe.modules.gamification.application.port.out;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +15,13 @@ public interface MetricRepository {
     List<UUID> findTopUsersByMetric(UserMetricType metricType, CollectPeriod collectPeriod, int limit);
 
     Optional<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type, CollectPeriod collectPeriod);
+
+    Map<UserMetricType, UserMetric> findByUserIdAndCollectPeriodAndTypes(
+            UUID userId,
+            CollectPeriod collectPeriod,
+            List<UserMetricType> metricTypes);
+
+    Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(UUID userId, UserMetricType metricType);
 
     UserMetric save(UserMetric userMetric);
 

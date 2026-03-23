@@ -25,5 +25,7 @@ public interface MetricRepository {
 
     UserMetric save(UserMetric userMetric);
 
+    void upsertValue(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value);
+
     void deleteAllByCollectPeriod(CollectPeriod collectPeriod);
 }

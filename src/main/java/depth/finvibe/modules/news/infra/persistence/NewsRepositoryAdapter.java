@@ -2,8 +2,10 @@ package depth.finvibe.modules.news.infra.persistence;
 
 import depth.finvibe.modules.news.application.port.out.NewsRepository;
 import depth.finvibe.modules.news.domain.News;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.Set;
 public class NewsRepositoryAdapter implements NewsRepository {
 
     private final NewsJpaRepository newsJpaRepository;
+    private final EntityManager entityManager;
 
     @Override
     public News save(News news) {
@@ -42,6 +45,18 @@ public class NewsRepositoryAdapter implements NewsRepository {
             return Set.of();
         }
         return newsJpaRepository.findExistingTitlesIn(titles);
+    }
+
+    @Override
+    public List<News> findPageAfterId(Long lastNewsId, int limit) {
+        long cursor = lastNewsId == null ? 0L : lastNewsId;
+        return newsJpaRepository.findByIdGreaterThanOrderByIdAsc(cursor, PageRequest.of(0, limit)).getContent();
+    }
+
+    @Override
+    public void flushAndClear() {
+        entityManager.flush();
+        entityManager.clear();
     }
 
     @Override

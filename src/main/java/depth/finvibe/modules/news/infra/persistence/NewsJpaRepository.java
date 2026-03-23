@@ -15,6 +15,10 @@ public interface NewsJpaRepository extends JpaRepository<News, Long> {
     @Query("select n.title from News n where n.title in :titles")
     Set<String> findExistingTitlesIn(@Param("titles") List<String> titles);
 
+    org.springframework.data.domain.Page<News> findByIdGreaterThanOrderByIdAsc(
+            Long id,
+            org.springframework.data.domain.Pageable pageable);
+
     org.springframework.data.domain.Page<News> findAllByOrderByPublishedAtDescIdDesc(
             org.springframework.data.domain.Pageable pageable);
 

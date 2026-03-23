@@ -28,6 +28,7 @@ public class NewsCommandService implements NewsCommandUseCase {
     private static final Long DEFAULT_CATEGORY_ID = 4L;
     private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
     private static final String DEFAULT_PROVIDER = "NAVER";
+    private static final int DISCUSSION_SYNC_CHUNK_SIZE = 500;
 
     private final NewsRepository newsRepository;
     private final NewsCrawler newsCrawler;
@@ -90,19 +91,26 @@ public class NewsCommandService implements NewsCommandUseCase {
 
     @Override
     public void syncAllDiscussionCounts() {
-        List<News> allNews = newsRepository.findAll();
-        List<Long> newsIds = allNews.stream().map(News::getId).toList();
-
-        // 벌크로 토론 수 조회 (네트워크 호출 최소화)
-        java.util.Map<Long, Long> countsMap = newsDiscussionPort.getDiscussionCounts(newsIds);
-
-        for (News news : allNews) {
-            long currentCount = countsMap.getOrDefault(news.getId(), 0L);
-
-            if (news.getDiscussionCount() != currentCount) {
-                news.syncDiscussionCount(currentCount);
-                newsRepository.save(news);
+        Long lastNewsId = 0L;
+        while (true) {
+            List<News> newsPage = newsRepository.findPageAfterId(lastNewsId, DISCUSSION_SYNC_CHUNK_SIZE);
+            if (newsPage.isEmpty()) {
+                return;
             }
+
+            List<Long> newsIds = newsPage.stream().map(News::getId).toList();
+            java.util.Map<Long, Long> countsMap = newsDiscussionPort.getDiscussionCounts(newsIds);
+
+            for (News news : newsPage) {
+                long currentCount = countsMap.getOrDefault(news.getId(), 0L);
+
+                if (news.getDiscussionCount() != currentCount) {
+                    news.syncDiscussionCount(currentCount);
+                }
+            }
+
+            lastNewsId = newsPage.get(newsPage.size() - 1).getId();
+            newsRepository.flushAndClear();
         }
     }
 

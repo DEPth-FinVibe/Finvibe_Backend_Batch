@@ -69,6 +69,21 @@ public class MetricRepositoryImpl implements MetricRepository {
     }
 
     @Override
+    public void upsertValue(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
+        int updatedRowCount = metricJpaRepository.updateValue(userId, metricType, collectPeriod, value);
+        if (updatedRowCount > 0) {
+            return;
+        }
+
+        metricJpaRepository.save(UserMetric.builder()
+                .userId(userId)
+                .type(metricType)
+                .collectPeriod(collectPeriod)
+                .value(value)
+                .build());
+    }
+
+    @Override
     public void deleteAllByCollectPeriod(CollectPeriod collectPeriod) {
         metricJpaRepository.deleteByCollectPeriod(collectPeriod);
     }

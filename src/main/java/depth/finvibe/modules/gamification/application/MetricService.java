@@ -120,21 +120,11 @@ public class MetricService implements MetricCommandUseCase {
         }
 
         double updatedValue = getMetricValue(metricsByPeriod.get(CollectPeriod.WEEKLY)) + increase;
-        metricRepository.save(UserMetric.builder()
-                .userId(userId)
-                .type(metricType)
-                .collectPeriod(CollectPeriod.WEEKLY)
-                .value(updatedValue)
-                .build());
+        metricRepository.upsertValue(userId, metricType, CollectPeriod.WEEKLY, updatedValue);
     }
 
     private void saveMetric(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
-        metricRepository.save(UserMetric.builder()
-                .userId(userId)
-                .type(metricType)
-                .collectPeriod(collectPeriod)
-                .value(value)
-                .build());
+        metricRepository.upsertValue(userId, metricType, collectPeriod, value);
     }
 
     private boolean isWeeklyMetric(UserMetricType metricType) {

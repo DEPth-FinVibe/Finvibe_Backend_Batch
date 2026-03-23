@@ -18,6 +18,10 @@ public interface NewsRepository {
 
     Set<String> findExistingTitlesIn(List<String> titles);
 
+    List<News> findPageAfterId(Long lastNewsId, int limit);
+
+    void flushAndClear();
+
     org.springframework.data.domain.Page<News> findAll(org.springframework.data.domain.Pageable pageable);
 
     org.springframework.data.domain.Page<News> findAllOrderByPublishedAtDescIdDesc(

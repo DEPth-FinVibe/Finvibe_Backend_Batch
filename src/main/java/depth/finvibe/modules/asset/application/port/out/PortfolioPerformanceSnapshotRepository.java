@@ -6,4 +6,6 @@ import depth.finvibe.modules.asset.domain.PortfolioPerformanceSnapshotDaily;
 
 public interface PortfolioPerformanceSnapshotRepository {
   void saveAll(List<PortfolioPerformanceSnapshotDaily> snapshots);
+
+  void flushAndClear();
 }

@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +22,31 @@ public class PortfolioPerformanceSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final PortfolioPerformanceSnapshotRepository portfolioPerformanceSnapshotRepository;
 
+  @Value("${batch.chunk.portfolio-snapshot-size:500}")
+  private int portfolioChunkSize;
+
   @Transactional
   public void saveDailySnapshot(LocalDate snapshotDate) {
     if (snapshotDate == null) {
       return;
     }
 
-    List<PortfolioGroup> portfolios = portfolioGroupRepository.findAllWithAssets();
-    if (portfolios == null || portfolios.isEmpty()) {
-      return;
-    }
+    Long lastPortfolioId = null;
+    while (true) {
+      List<Long> portfolioIds = portfolioGroupRepository.findPortfolioIdsAfter(lastPortfolioId, portfolioChunkSize);
+      if (portfolioIds.isEmpty()) {
+        return;
+      }
 
+      List<PortfolioGroup> portfolios = portfolioGroupRepository.findAllWithAssetsByIds(portfolioIds);
+      saveSnapshotChunk(portfolios, snapshotDate);
+
+      lastPortfolioId = portfolioIds.get(portfolioIds.size() - 1);
+      portfolioPerformanceSnapshotRepository.flushAndClear();
+    }
+  }
+
+  private void saveSnapshotChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
     List<PortfolioPerformanceSnapshotDaily> snapshots = portfolios.stream()
       .filter(portfolio -> portfolio.getId() != null)
       .map(portfolio -> toSnapshot(portfolio, snapshotDate))

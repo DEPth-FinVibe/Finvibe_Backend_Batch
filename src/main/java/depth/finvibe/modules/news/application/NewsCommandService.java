@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +39,11 @@ public class NewsCommandService implements NewsCommandUseCase {
     @Override
     public void syncLatestNews() {
         List<NewsCrawler.RawNewsData> rawDataList = newsCrawler.fetchLatestRawNews();
+        Set<String> existingTitles = newsRepository.findExistingTitlesIn(
+                rawDataList.stream()
+                        .map(NewsCrawler.RawNewsData::title)
+                        .toList()
+        );
         List<CategoryInfo> categories = categoryCatalogPort.getAll();
         if (categories.isEmpty()) {
             throw new IllegalStateException("No categories available from market catalog");
@@ -45,7 +51,7 @@ public class NewsCommandService implements NewsCommandUseCase {
         CategoryInfo defaultCategory = resolveDefaultCategory(categories);
 
         for (NewsCrawler.RawNewsData rawData : rawDataList) {
-            if (newsRepository.existsByTitle(rawData.title())) {
+            if (existingTitles.contains(rawData.title())) {
                 continue;
             }
 

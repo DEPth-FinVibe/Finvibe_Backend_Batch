@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +36,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class XpService implements XpCommandUseCase {
-
     private final UserXpAwardRepository userXpAwardRepository;
     private final UserXpRepository userXpRepository;
     private final UserXpRankingSnapshotRepository userXpRankingSnapshotRepository;
@@ -43,6 +43,9 @@ public class XpService implements XpCommandUseCase {
     private final SquadRankingHistoryRepository squadRankingHistoryRepository;
     private final UserSquadRepository userSquadRepository;
     private final UserServiceClient userServiceClient;
+
+    @Value("${batch.chunk.user-ranking-snapshot-size:500}")
+    private int rankingSnapshotChunkSize;
 
     @Override
     @Transactional
@@ -94,8 +97,9 @@ public class XpService implements XpCommandUseCase {
     }
 
     private UserXp findOrCreateUserXp(UUID userId) {
-        if (userXpRepository.findByUserId(userId).isPresent()) {
-            return userXpRepository.findByUserId(userId).get();
+        var existingUserXp = userXpRepository.findByUserId(userId);
+        if (existingUserXp.isPresent()) {
+            return existingUserXp.get();
         }
 
         String nickname = userServiceClient.getNickname(userId)
@@ -121,9 +125,7 @@ public class XpService implements XpCommandUseCase {
     }
 
     private void resetAllUsersWeeklyXp() {
-        List<UserXp> allUserXp = userXpRepository.findAll();
-        allUserXp.forEach(UserXp::resetWeeklyXp);
-        userXpRepository.saveAll(allUserXp);
+        userXpRepository.resetAllWeeklyXp();
     }
 
     private void saveRankingHistory(SquadXp squadXp, int ranking) {
@@ -176,52 +178,63 @@ public class XpService implements XpCommandUseCase {
             case MONTHLY -> currentStart.plusMonths(1);
         };
         LocalDateTime previousStart = getPreviousStart(rankingPeriod, currentStart);
+        userXpRankingSnapshotRepository.deleteSnapshots(rankingPeriod, currentStart.toLocalDate());
 
-        List<UserXpAwardRepository.UserPeriodXp> rankedUsers = userXpAwardRepository
-                .findUserPeriodXpRankingBetween(currentStart, currentEnd, Integer.MAX_VALUE);
+        long offset = 0L;
+        int ranking = 1;
+        while (true) {
+            List<UserXpAwardRepository.UserPeriodXp> rankedUsers = userXpAwardRepository
+                    .findUserPeriodXpRankingBetween(currentStart, currentEnd, offset, rankingSnapshotChunkSize);
 
-        List<UserXpAwardRepository.UserPeriodXp> uniqueRankedUsers = deduplicateRankedUsers(rankedUsers, rankingPeriod, currentStart.toLocalDate());
+            if (rankedUsers.isEmpty()) {
+                return;
+            }
 
-        if (uniqueRankedUsers.isEmpty()) {
-            userXpRankingSnapshotRepository.replaceSnapshots(rankingPeriod, currentStart.toLocalDate(), List.of());
-            return;
-        }
-
-        List<UUID> userIds = uniqueRankedUsers.stream()
-                .map(UserXpAwardRepository.UserPeriodXp::userId)
-                .toList();
-
-        Map<UUID, Long> previousXpMap = userXpAwardRepository.findUserPeriodXpMapBetween(
-                userIds,
-                previousStart,
-                currentStart);
-
-        Map<UUID, UserXp> userXpMap = new HashMap<>();
-        for (UserXp userXp : userXpRepository.findAllByUserIdIn(userIds)) {
-            userXpMap.put(userXp.getUserId(), userXp);
-        }
-
-        List<UserXpRankingSnapshot> snapshots = new ArrayList<>(uniqueRankedUsers.size());
-        for (int i = 0; i < uniqueRankedUsers.size(); i++) {
-            UserXpAwardRepository.UserPeriodXp rankedUser = uniqueRankedUsers.get(i);
-            UserXp userXp = userXpMap.get(rankedUser.userId());
-            long previousPeriodXp = previousXpMap.getOrDefault(rankedUser.userId(), 0L);
-
-            snapshots.add(UserXpRankingSnapshot.of(
+            List<UserXpAwardRepository.UserPeriodXp> uniqueRankedUsers = deduplicateRankedUsers(
+                    rankedUsers,
                     rankingPeriod,
-                    currentStart.toLocalDate(),
-                    currentEnd.toLocalDate().minusDays(1),
-                    rankedUser.userId(),
-                    userXp != null ? userXp.getNickname() : "이름 없음",
-                    i + 1,
-                    userXp != null ? userXp.getTotalXp() : rankedUser.xp(),
-                    rankedUser.xp(),
-                    previousPeriodXp,
-                    calculateGrowthRate(rankedUser.xp(), previousPeriodXp),
-                    now));
-        }
+                    currentStart.toLocalDate());
+            if (uniqueRankedUsers.isEmpty()) {
+                offset += rankedUsers.size();
+                continue;
+            }
 
-        userXpRankingSnapshotRepository.replaceSnapshots(rankingPeriod, currentStart.toLocalDate(), snapshots);
+            List<UUID> userIds = uniqueRankedUsers.stream()
+                    .map(UserXpAwardRepository.UserPeriodXp::userId)
+                    .toList();
+
+            Map<UUID, Long> previousXpMap = userXpAwardRepository.findUserPeriodXpMapBetween(
+                    userIds,
+                    previousStart,
+                    currentStart);
+
+            Map<UUID, UserXp> userXpMap = new HashMap<>();
+            for (UserXp userXp : userXpRepository.findAllByUserIdIn(userIds)) {
+                userXpMap.put(userXp.getUserId(), userXp);
+            }
+
+            List<UserXpRankingSnapshot> snapshots = new ArrayList<>(uniqueRankedUsers.size());
+            for (UserXpAwardRepository.UserPeriodXp rankedUser : uniqueRankedUsers) {
+                UserXp userXp = userXpMap.get(rankedUser.userId());
+                long previousPeriodXp = previousXpMap.getOrDefault(rankedUser.userId(), 0L);
+
+                snapshots.add(UserXpRankingSnapshot.of(
+                        rankingPeriod,
+                        currentStart.toLocalDate(),
+                        currentEnd.toLocalDate().minusDays(1),
+                        rankedUser.userId(),
+                        userXp != null ? userXp.getNickname() : "이름 없음",
+                        ranking++,
+                        userXp != null ? userXp.getTotalXp() : rankedUser.xp(),
+                        rankedUser.xp(),
+                        previousPeriodXp,
+                        calculateGrowthRate(rankedUser.xp(), previousPeriodXp),
+                        now));
+            }
+
+            userXpRankingSnapshotRepository.saveAll(snapshots);
+            offset += rankedUsers.size();
+        }
     }
 
     private List<UserXpAwardRepository.UserPeriodXp> deduplicateRankedUsers(

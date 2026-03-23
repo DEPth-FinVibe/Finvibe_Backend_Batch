@@ -36,6 +36,16 @@ public class PortfolioGroupRepositoryImpl implements PortfolioGroupRepository {
     }
 
     @Override
+    public List<Long> findPortfolioIdsAfter(Long lastPortfolioId, int limit) {
+        return queryRepository.findPortfolioIdsAfter(lastPortfolioId, limit);
+    }
+
+    @Override
+    public List<PortfolioGroup> findAllWithAssetsByIds(List<Long> portfolioIds) {
+        return queryRepository.findAllWithAssetsByIds(portfolioIds);
+    }
+
+    @Override
     public void delete(PortfolioGroup existing) {
         jpaRepository.delete(existing);
     }

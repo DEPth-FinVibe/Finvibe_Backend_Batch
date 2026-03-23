@@ -36,6 +36,11 @@ management:
       percentiles-histogram:
         http.server.requests: true
 
+batch:
+  chunk:
+    portfolio-snapshot-size: 500
+    user-ranking-snapshot-size: 500
+
 resilience4j:
   circuitbreaker:
     configs:

@@ -3,6 +3,7 @@ package depth.finvibe.modules.news.application.port.out;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import depth.finvibe.modules.news.domain.News;
 
@@ -14,6 +15,8 @@ public interface NewsRepository {
     Optional<News> findById(Long id);
 
     boolean existsByTitle(String title);
+
+    Set<String> findExistingTitlesIn(List<String> titles);
 
     org.springframework.data.domain.Page<News> findAll(org.springframework.data.domain.Pageable pageable);
 

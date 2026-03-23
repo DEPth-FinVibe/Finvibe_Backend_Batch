@@ -1,0 +1,119 @@
+name: Batch CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: batch-cd-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build application
+        run: ./gradlew clean bootJar
+
+      - name: Prepare SSH key
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/finvibe_batch_key
+          chmod 600 ~/.ssh/finvibe_batch_key
+
+      - name: Create environment file
+        run: |
+          cat > .env.prod <<EOF
+          SPRING_PROFILES_ACTIVE=prod
+          DB_URL=${{ secrets.DB_URL }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          KAFKA_BOOTSTRAP_SERVERS=${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL_NAME=${{ secrets.GEMINI_MODEL_NAME }}
+          GEMINI_HIGH_MODEL_NAME=${{ secrets.GEMINI_HIGH_MODEL_NAME }}
+          KIS_USER_ID=${{ secrets.KIS_USER_ID }}
+          KIS_API_KEY_1=${{ secrets.KIS_API_KEY_1 }}
+          KIS_API_SECRET_1=${{ secrets.KIS_API_SECRET_1 }}
+          KIS_API_KEY_2=${{ secrets.KIS_API_KEY_2 }}
+          KIS_API_SECRET_2=${{ secrets.KIS_API_SECRET_2 }}
+          KIS_BASE_URL=${{ secrets.KIS_BASE_URL }}
+          KIS_WEBSOCKET_URL=${{ secrets.KIS_WEBSOCKET_URL }}
+          EOF
+
+      - name: Register EC2 host key
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PORT: ${{ secrets.EC2_PORT }}
+        run: |
+          ssh-keyscan -p "${EC2_PORT:-22}" -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure remote deploy directory
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PORT: ${{ secrets.EC2_PORT }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/finvibe_batch_key -p "${EC2_PORT:-22}" "${EC2_USER}@${EC2_HOST}" \
+            'mkdir -p "$HOME/finvibe-batch"'
+
+      - name: Upload JAR
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PORT: ${{ secrets.EC2_PORT }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          scp -i ~/.ssh/finvibe_batch_key -P "${EC2_PORT:-22}" \
+            build/libs/*.jar \
+            "${EC2_USER}@${EC2_HOST}:/home/${EC2_USER}/finvibe-batch/app.jar"
+          scp -i ~/.ssh/finvibe_batch_key -P "${EC2_PORT:-22}" \
+            .env.prod \
+            "${EC2_USER}@${EC2_HOST}:/home/${EC2_USER}/finvibe-batch/.env"
+
+      - name: Deploy on EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PORT: ${{ secrets.EC2_PORT }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          ssh -i ~/.ssh/finvibe_batch_key -p "${EC2_PORT:-22}" "${EC2_USER}@${EC2_HOST}" <<'EOF'
+            set -e
+            mkdir -p "$HOME/finvibe-batch"
+
+            if [ -f "$HOME/finvibe-batch/app.pid" ] && kill -0 "$(cat "$HOME/finvibe-batch/app.pid")" 2>/dev/null; then
+              kill "$(cat "$HOME/finvibe-batch/app.pid")"
+              sleep 10
+            fi
+
+            pgrep -f 'finvibe-batch/app.jar' | xargs -r kill
+            sleep 5
+
+            nohup java -jar "$HOME/finvibe-batch/app.jar" \
+              --spring.profiles.active=prod \
+              > "$HOME/finvibe-batch/app.log" 2>&1 < /dev/null &
+
+            echo $! > "$HOME/finvibe-batch/app.pid"
+          EOF

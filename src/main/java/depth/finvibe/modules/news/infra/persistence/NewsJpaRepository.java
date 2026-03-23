@@ -7,9 +7,13 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public interface NewsJpaRepository extends JpaRepository<News, Long> {
     boolean existsByTitle(String title);
+
+    @Query("select n.title from News n where n.title in :titles")
+    Set<String> findExistingTitlesIn(@Param("titles") List<String> titles);
 
     org.springframework.data.domain.Page<News> findAllByOrderByPublishedAtDescIdDesc(
             org.springframework.data.domain.Pageable pageable);

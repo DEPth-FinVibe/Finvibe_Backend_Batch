@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +17,33 @@ import depth.finvibe.modules.gamification.domain.enums.RankingPeriod;
 @Repository
 public class UserXpRankingSnapshotRepositoryImpl implements UserXpRankingSnapshotRepository {
     private final UserXpRankingSnapshotJpaRepository userXpRankingSnapshotJpaRepository;
+    private final EntityManager entityManager;
 
-    public UserXpRankingSnapshotRepositoryImpl(UserXpRankingSnapshotJpaRepository userXpRankingSnapshotJpaRepository) {
+    public UserXpRankingSnapshotRepositoryImpl(
+            UserXpRankingSnapshotJpaRepository userXpRankingSnapshotJpaRepository,
+            EntityManager entityManager) {
         this.userXpRankingSnapshotJpaRepository = userXpRankingSnapshotJpaRepository;
+        this.entityManager = entityManager;
+    }
+
+    @Override
+    @Transactional
+    public void deleteSnapshots(RankingPeriod periodType, LocalDate periodStartDate) {
+        userXpRankingSnapshotJpaRepository.deleteByPeriodTypeAndPeriodStartDate(periodType, periodStartDate);
+        entityManager.flush();
+        entityManager.clear();
+    }
+
+    @Override
+    @Transactional
+    public void saveAll(List<UserXpRankingSnapshot> snapshots) {
+        if (snapshots.isEmpty()) {
+            return;
+        }
+
+        userXpRankingSnapshotJpaRepository.saveAll(snapshots);
+        entityManager.flush();
+        entityManager.clear();
     }
 
     @Override
@@ -27,10 +52,10 @@ public class UserXpRankingSnapshotRepositoryImpl implements UserXpRankingSnapsho
             RankingPeriod periodType,
             LocalDate periodStartDate,
             List<UserXpRankingSnapshot> snapshots) {
-        userXpRankingSnapshotJpaRepository.deleteByPeriodTypeAndPeriodStartDate(periodType, periodStartDate);
+        deleteSnapshots(periodType, periodStartDate);
 
         if (!snapshots.isEmpty()) {
-            userXpRankingSnapshotJpaRepository.saveAllAndFlush(snapshots);
+            saveAll(snapshots);
         }
     }
 

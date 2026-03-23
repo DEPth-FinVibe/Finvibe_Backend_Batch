@@ -47,6 +47,7 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
     public List<UserPeriodXp> findUserPeriodXpRankingBetween(
             LocalDateTime startInclusive,
             LocalDateTime endExclusive,
+            long offset,
             int limit) {
         QUserXpAward userXpAward = QUserXpAward.userXpAward;
 
@@ -57,6 +58,7 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
                         .and(userXpAward.createdAt.lt(endExclusive)))
                 .groupBy(userXpAward.userId)
                 .orderBy(userXpAward.xp.value.sum().desc(), userXpAward.userId.asc())
+                .offset(offset)
                 .limit(limit)
                 .fetch();
 

@@ -22,7 +22,11 @@ public interface UserXpAwardRepository {
      */
     List<UUID> findTopUsersByTotalXp(int limit);
 
-    List<UserPeriodXp> findUserPeriodXpRankingBetween(LocalDateTime startInclusive, LocalDateTime endExclusive, int limit);
+    List<UserPeriodXp> findUserPeriodXpRankingBetween(
+            LocalDateTime startInclusive,
+            LocalDateTime endExclusive,
+            long offset,
+            int limit);
 
     Map<UUID, Long> findUserPeriodXpMapBetween(
             List<UUID> userIds,

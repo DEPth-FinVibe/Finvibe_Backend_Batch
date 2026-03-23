@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 @RequiredArgsConstructor
@@ -33,6 +34,14 @@ public class NewsRepositoryAdapter implements NewsRepository {
     @Override
     public boolean existsByTitle(String title) {
         return newsJpaRepository.existsByTitle(title);
+    }
+
+    @Override
+    public Set<String> findExistingTitlesIn(List<String> titles) {
+        if (titles == null || titles.isEmpty()) {
+            return Set.of();
+        }
+        return newsJpaRepository.findExistingTitlesIn(titles);
     }
 
     @Override

@@ -44,4 +44,9 @@ public class UserXpRepositoryImpl implements UserXpRepository {
     public List<UserXp> findAllByUserIdIn(List<UUID> userIds) {
         return userXpJpaRepository.findAllByUserIdIn(userIds);
     }
+
+    @Override
+    public void resetAllWeeklyXp() {
+        userXpJpaRepository.resetAllWeeklyXp();
+    }
 }

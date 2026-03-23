@@ -14,5 +14,9 @@ public interface PortfolioGroupRepository {
 
     List<PortfolioGroup> findAllWithAssets();
 
+    List<Long> findPortfolioIdsAfter(Long lastPortfolioId, int limit);
+
+    List<PortfolioGroup> findAllWithAssetsByIds(List<Long> portfolioIds);
+
     void delete(PortfolioGroup existing);
 }

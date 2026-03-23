@@ -9,6 +9,12 @@ import depth.finvibe.modules.gamification.domain.UserXpRankingSnapshot;
 import depth.finvibe.modules.gamification.domain.enums.RankingPeriod;
 
 public interface UserXpRankingSnapshotRepository {
+    void deleteSnapshots(
+            RankingPeriod periodType,
+            LocalDate periodStartDate);
+
+    void saveAll(List<UserXpRankingSnapshot> snapshots);
+
     void replaceSnapshots(
             RankingPeriod periodType,
             LocalDate periodStartDate,

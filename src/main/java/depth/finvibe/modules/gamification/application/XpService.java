@@ -80,19 +80,12 @@ public class XpService implements XpCommandUseCase {
     }
 
     private void updateSquadXp(UUID userId, Long amount) {
-        userSquadRepository.findByUserId(userId).ifPresent(userSquad -> {
-            if (userSquad.getSquad() == null || userSquad.getSquad().getId() == null) {
+        userSquadRepository.findSquadIdByUserId(userId).ifPresent(squadId -> {
+            if (squadId == null) {
                 log.warn("스쿼드 XP 갱신 생략 - 사용자 스쿼드 정보가 유효하지 않음: {}", userId);
                 return;
             }
-
-            Long squadId = userSquad.getSquad().getId();
-            SquadXp squadXp = squadXpRepository.findBySquadId(squadId)
-                    .orElseGet(() -> SquadXp.builder()
-                            .squad(userSquad.getSquad())
-                            .build());
-            squadXp.addXp(amount);
-            squadXpRepository.save(squadXp);
+            squadXpRepository.addXp(squadId, amount);
         });
     }
 

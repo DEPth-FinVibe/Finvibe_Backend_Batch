@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,7 +29,6 @@ public class NewsCommandService implements NewsCommandUseCase {
     private static final Long DEFAULT_CATEGORY_ID = 4L;
     private static final ZoneId KST_ZONE = ZoneId.of("Asia/Seoul");
     private static final String DEFAULT_PROVIDER = "NAVER";
-    private static final int DISCUSSION_SYNC_CHUNK_SIZE = 500;
 
     private final NewsRepository newsRepository;
     private final NewsCrawler newsCrawler;
@@ -36,6 +36,9 @@ public class NewsCommandService implements NewsCommandUseCase {
     private final NewsDiscussionPort newsDiscussionPort;
     private final CategoryCatalogPort categoryCatalogPort;
     private final MeterRegistry meterRegistry;
+
+    @Value("${batch.chunk.news-discussion-sync-size:500}")
+    private int discussionSyncChunkSize;
 
     @Override
     public void syncLatestNews() {
@@ -93,7 +96,7 @@ public class NewsCommandService implements NewsCommandUseCase {
     public void syncAllDiscussionCounts() {
         Long lastNewsId = 0L;
         while (true) {
-            List<News> newsPage = newsRepository.findPageAfterId(lastNewsId, DISCUSSION_SYNC_CHUNK_SIZE);
+            List<News> newsPage = newsRepository.findPageAfterId(lastNewsId, discussionSyncChunkSize);
             if (newsPage.isEmpty()) {
                 return;
             }

@@ -26,6 +26,11 @@ public class UserSquadRepositoryImpl implements UserSquadRepository {
     }
 
     @Override
+    public Optional<Long> findSquadIdByUserId(UUID userId) {
+        return userSquadJpaRepository.findSquadIdByUserId(userId);
+    }
+
+    @Override
     public List<UserSquad> findAllBySquadId(Long squadId) {
         return userSquadJpaRepository.findAllBySquadId(squadId);
     }

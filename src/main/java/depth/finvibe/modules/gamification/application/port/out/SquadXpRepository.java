@@ -9,5 +9,6 @@ public interface SquadXpRepository {
     void save(SquadXp squadXp);
     void saveAll(List<SquadXp> squadXps);
     Optional<SquadXp> findBySquadId(Long squadId);
+    void addXp(Long squadId, Long amount);
     List<SquadXp> findAllByOrderByTotalXpDesc();
 }

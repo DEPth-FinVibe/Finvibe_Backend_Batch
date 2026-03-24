@@ -98,6 +98,14 @@ jobs:
               LOG_DIR_HOST="$HOME/finvibe-backend-batch/logs"
             fi
 
+            if [ -z "${KIS_BASE_URL:-}" ]; then
+              KIS_BASE_URL="https://openapi.koreainvestment.com:9443"
+            fi
+
+            if [ -z "${KIS_WEBSOCKET_URL:-}" ]; then
+              KIS_WEBSOCKET_URL="ws://ops.koreainvestment.com:21000"
+            fi
+
             IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
             CONTAINER_LOG_JSON_PATH="/app/logs/application-json.log"
 
@@ -138,8 +146,8 @@ jobs:
               -e KIS_API_SECRET_2="${KIS_API_SECRET_2}" \
               -e KIS_API_KEY_3="${KIS_API_KEY_3}" \
               -e KIS_API_SECRET_3="${KIS_API_SECRET_3}" \
-              -e KIS_BASE_URL="${KIS_BASE_URL}" \
-              -e KIS_WEBSOCKET_URL="${KIS_WEBSOCKET_URL}" \
+              -e KIS_BASE_URL="${KIS_BASE_URL:-https://openapi.koreainvestment.com:9443}" \
+              -e KIS_WEBSOCKET_URL="${KIS_WEBSOCKET_URL:-ws://ops.koreainvestment.com:21000}" \
               -v "${LOG_DIR_HOST}:/app/logs" \
               "${IMAGE_REF}"
 

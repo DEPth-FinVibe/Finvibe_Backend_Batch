@@ -3,6 +3,8 @@ package depth.finvibe.modules.market.infra.scheduler;
 import java.time.YearMonth;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.market.application.HolidayCalendarService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class HolidayCalendarScheduler {
 
   private final HolidayCalendarService holidayCalendarService;

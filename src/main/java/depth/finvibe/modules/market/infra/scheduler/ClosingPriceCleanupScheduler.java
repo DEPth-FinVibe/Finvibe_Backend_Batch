@@ -1,6 +1,8 @@
 package depth.finvibe.modules.market.infra.scheduler;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.market.application.port.out.ClosingPriceRepository;
 import depth.finvibe.modules.market.domain.MarketHours;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class ClosingPriceCleanupScheduler {
 
   private final ClosingPriceRepository closingPriceRepository;

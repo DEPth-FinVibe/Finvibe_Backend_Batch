@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.market.application.port.out.IndexPriceClient;
@@ -35,7 +36,7 @@ public class IndexMinuteCandleCacheService {
     private final StockRepository stockRepository;
     private final PriceCandleRepository priceCandleRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void cacheLatestMinuteCandles() {
         for (MarketIndexType indexType : MarketIndexType.values()) {
             cacheIndexMinuteCandles(indexType);
@@ -48,7 +49,7 @@ public class IndexMinuteCandleCacheService {
      *
      * @param indexType 초기화할 지수 타입 (KOSPI, KOSDAQ)
      */
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void initializeIndexMinuteCandlesIfEmpty(MarketIndexType indexType) {
         // 1. Stock 조회 또는 생성 (INDEX_KOSPI, INDEX_KOSDAQ 심볼)
         Stock indexStock = getOrCreateIndexStock(indexType);

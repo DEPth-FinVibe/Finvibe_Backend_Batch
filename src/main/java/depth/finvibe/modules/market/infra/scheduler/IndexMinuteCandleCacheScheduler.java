@@ -6,10 +6,13 @@ import depth.finvibe.modules.market.domain.enums.MarketStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class IndexMinuteCandleCacheScheduler {
 
     private final IndexMinuteCandleCacheService indexMinuteCandleCacheService;

@@ -55,7 +55,6 @@ public class NewsRepositoryAdapter implements NewsRepository {
 
     @Override
     public void flushAndClear() {
-        entityManager.flush();
         entityManager.clear();
     }
 

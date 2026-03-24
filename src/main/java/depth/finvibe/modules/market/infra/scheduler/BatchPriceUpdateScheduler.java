@@ -3,6 +3,8 @@ package depth.finvibe.modules.market.infra.scheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.market.application.BatchPriceUpdateService;
 import depth.finvibe.modules.market.domain.MarketHours;
@@ -11,6 +13,7 @@ import depth.finvibe.modules.market.domain.enums.MarketStatus;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 public class BatchPriceUpdateScheduler {
 
   private final BatchPriceUpdateService batchPriceUpdateService;

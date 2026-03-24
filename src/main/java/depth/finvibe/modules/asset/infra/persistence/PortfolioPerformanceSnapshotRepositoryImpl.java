@@ -25,7 +25,6 @@ public class PortfolioPerformanceSnapshotRepositoryImpl implements PortfolioPerf
 
   @Override
   public void flushAndClear() {
-    entityManager.flush();
     entityManager.clear();
   }
 }

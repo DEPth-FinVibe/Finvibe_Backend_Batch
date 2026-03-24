@@ -10,6 +10,7 @@ import depth.finvibe.modules.news.application.port.out.CategoryCatalogPort;
 import depth.finvibe.common.insight.domain.CategoryInfo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -19,7 +20,6 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class ThemeCommandService implements ThemeCommandUseCase {
 
     private static final int ANALYSIS_NEWS_LIMIT = 20;
@@ -31,6 +31,7 @@ public class ThemeCommandService implements ThemeCommandUseCase {
     private final ThemeDailyRepository themeDailyRepository;
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void generateTodayThemes() {
         LocalDate today = LocalDate.now(KST_ZONE);
         LocalDateTime start = today.atStartOfDay();

@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.jsoup.Jsoup;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -23,7 +24,6 @@ import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class NewsCommandService implements NewsCommandUseCase {
 
     private static final Long DEFAULT_CATEGORY_ID = 4L;
@@ -41,6 +41,7 @@ public class NewsCommandService implements NewsCommandUseCase {
     private int discussionSyncChunkSize;
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void syncLatestNews() {
         List<NewsCrawler.RawNewsData> rawDataList = newsCrawler.fetchLatestRawNews();
         Set<String> existingTitles = newsRepository.findExistingTitlesIn(
@@ -93,6 +94,7 @@ public class NewsCommandService implements NewsCommandUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void syncAllDiscussionCounts() {
         Long lastNewsId = 0L;
         while (true) {
@@ -109,6 +111,7 @@ public class NewsCommandService implements NewsCommandUseCase {
 
                 if (news.getDiscussionCount() != currentCount) {
                     news.syncDiscussionCount(currentCount);
+                    newsRepository.save(news);
                 }
             }
 

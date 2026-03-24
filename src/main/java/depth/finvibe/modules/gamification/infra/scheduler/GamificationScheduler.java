@@ -3,6 +3,8 @@ package depth.finvibe.modules.gamification.infra.scheduler;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.gamification.application.port.in.ChallengeCommandUseCase;
 import depth.finvibe.modules.gamification.application.port.in.MetricCommandUseCase;
@@ -10,6 +12,7 @@ import depth.finvibe.modules.gamification.application.port.in.XpCommandUseCase;
 
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 /**
  * KST 기준으로 주간 갱신 배치 작업을 실행합니다.
  */

@@ -54,7 +54,6 @@ public class UserProfitSnapshotRepositoryImpl implements UserProfitSnapshotRepos
 
   @Override
   public void flushAndClear() {
-    entityManager.flush();
     entityManager.clear();
   }
 }

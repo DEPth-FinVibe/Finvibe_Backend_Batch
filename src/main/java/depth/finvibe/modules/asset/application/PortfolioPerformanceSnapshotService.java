@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
@@ -25,7 +26,7 @@ public class PortfolioPerformanceSnapshotService {
   @Value("${batch.chunk.portfolio-snapshot-size:500}")
   private int portfolioChunkSize;
 
-  @Transactional
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void saveDailySnapshot(LocalDate snapshotDate) {
     if (snapshotDate == null) {
       return;

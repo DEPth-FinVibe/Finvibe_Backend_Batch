@@ -21,7 +21,7 @@
 				<maxHistory>7</maxHistory>
 			</rollingPolicy>
 			<encoder class="net.logstash.logback.encoder.LogstashEncoder">
-				<customFields>{"app":"finvibe-backend"}</customFields>
+				<customFields>{"app":"finvibe-backend-batch"}</customFields>
 			</encoder>
 		</appender>
 

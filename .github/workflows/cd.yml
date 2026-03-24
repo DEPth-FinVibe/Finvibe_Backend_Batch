@@ -6,12 +6,12 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-
-concurrency:
-  group: batch-cd-production
-  cancel-in-progress: true
+env:
+  IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME || format('{0}/finvibe-backend-batch', secrets.DOCKERHUB_USERNAME) }}
+  CONTAINER_NAME: ${{ vars.DEPLOY_CONTAINER_NAME || 'finvibe-batch' }}
+  LOG_DIR_HOST: ${{ vars.LOG_DIR_HOST || '/var/log/finvibe-backend-batch' }}
+  PRIMARY_DOCKER_NETWORK: ${{ vars.PRIMARY_DOCKER_NETWORK || 'infra_bridge' }}
+  SECONDARY_DOCKER_NETWORK: ${{ vars.SECONDARY_DOCKER_NETWORK || '' }}
 
 jobs:
   deploy:
@@ -21,99 +21,154 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          distribution: temurin
-          java-version: "21"
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Grant execute permission for Gradle
-        run: chmod +x ./gradlew
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ github.sha }}
 
-      - name: Build application
-        run: ./gradlew clean bootJar
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Prepare SSH key
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
         env:
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/finvibe_batch_key
-          chmod 600 ~/.ssh/finvibe_batch_key
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          LOG_DIR_HOST: ${{ env.LOG_DIR_HOST }}
+          PRIMARY_DOCKER_NETWORK: ${{ env.PRIMARY_DOCKER_NETWORK }}
+          SECONDARY_DOCKER_NETWORK: ${{ env.SECONDARY_DOCKER_NETWORK }}
+          IMAGE_TAG: ${{ github.sha }}
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          KAFKA_BOOTSTRAP_SERVERS: ${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KIS_USER_ID: ${{ secrets.KIS_USER_ID }}
+          KIS_API_KEY_1: ${{ secrets.KIS_API_KEY_1 }}
+          KIS_API_SECRET_1: ${{ secrets.KIS_API_SECRET_1 }}
+          KIS_API_KEY_2: ${{ secrets.KIS_API_KEY_2 }}
+          KIS_API_SECRET_2: ${{ secrets.KIS_API_SECRET_2 }}
+          KIS_API_KEY_3: ${{ secrets.KIS_API_KEY_3 }}
+          KIS_API_SECRET_3: ${{ secrets.KIS_API_SECRET_3 }}
+          KIS_BASE_URL: ${{ secrets.KIS_BASE_URL }}
+          KIS_WEBSOCKET_URL: ${{ secrets.KIS_WEBSOCKET_URL }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,IMAGE_NAME,CONTAINER_NAME,LOG_DIR_HOST,PRIMARY_DOCKER_NETWORK,SECONDARY_DOCKER_NETWORK,IMAGE_TAG,DB_URL,DB_USERNAME,DB_PASSWORD,REDIS_HOST,REDIS_PORT,REDIS_PASSWORD,KAFKA_BOOTSTRAP_SERVERS,GEMINI_API_KEY,KIS_USER_ID,KIS_API_KEY_1,KIS_API_SECRET_1,KIS_API_KEY_2,KIS_API_SECRET_2,KIS_API_KEY_3,KIS_API_SECRET_3,KIS_BASE_URL,KIS_WEBSOCKET_URL
+          script_stop: true
+          script: |
+            set -eu
 
-      - name: Create environment file
-        run: |
-          cat > .env.prod <<EOF
-          SPRING_PROFILES_ACTIVE=prod
-          DB_URL=${{ secrets.DB_URL }}
-          DB_USERNAME=${{ secrets.DB_USERNAME }}
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          REDIS_HOST=${{ secrets.REDIS_HOST }}
-          REDIS_PORT=${{ secrets.REDIS_PORT }}
-          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-          KAFKA_BOOTSTRAP_SERVERS=${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL_NAME=${{ secrets.GEMINI_MODEL_NAME }}
-          GEMINI_HIGH_MODEL_NAME=${{ secrets.GEMINI_HIGH_MODEL_NAME }}
-          KIS_USER_ID=${{ secrets.KIS_USER_ID }}
-          KIS_API_KEY_1=${{ secrets.KIS_API_KEY_1 }}
-          KIS_API_SECRET_1=${{ secrets.KIS_API_SECRET_1 }}
-          KIS_API_KEY_2=${{ secrets.KIS_API_KEY_2 }}
-          KIS_API_SECRET_2=${{ secrets.KIS_API_SECRET_2 }}
-          KIS_BASE_URL=${{ secrets.KIS_BASE_URL }}
-          KIS_WEBSOCKET_URL=${{ secrets.KIS_WEBSOCKET_URL }}
-          EOF
+            required_vars="DB_URL DB_USERNAME DB_PASSWORD REDIS_HOST REDIS_PORT KAFKA_BOOTSTRAP_SERVERS GEMINI_API_KEY KIS_USER_ID KIS_API_KEY_1 KIS_API_SECRET_1"
+            for var_name in ${required_vars}; do
+              eval "var_value=\${${var_name}:-}"
+              if [ -z "${var_value}" ]; then
+                echo "Required deployment variable is missing: ${var_name}"
+                exit 1
+              fi
+            done
 
-      - name: Register EC2 host key
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_PORT: ${{ secrets.EC2_PORT }}
-        run: |
-          ssh-keyscan -p "${EC2_PORT:-22}" -H "$EC2_HOST" >> ~/.ssh/known_hosts
+            IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
+            CONTAINER_LOG_JSON_PATH="/app/logs/application-json.log"
 
-      - name: Ensure remote deploy directory
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_PORT: ${{ secrets.EC2_PORT }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          ssh -i ~/.ssh/finvibe_batch_key -p "${EC2_PORT:-22}" "${EC2_USER}@${EC2_HOST}" \
-            'mkdir -p "$HOME/finvibe-batch"'
+            mkdir -p "${LOG_DIR_HOST}"
 
-      - name: Upload JAR
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_PORT: ${{ secrets.EC2_PORT }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          scp -i ~/.ssh/finvibe_batch_key -P "${EC2_PORT:-22}" \
-            build/libs/*.jar \
-            "${EC2_USER}@${EC2_HOST}:/home/${EC2_USER}/finvibe-batch/app.jar"
-          scp -i ~/.ssh/finvibe_batch_key -P "${EC2_PORT:-22}" \
-            .env.prod \
-            "${EC2_USER}@${EC2_HOST}:/home/${EC2_USER}/finvibe-batch/.env"
+            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+            docker pull "${IMAGE_REF}"
 
-      - name: Deploy on EC2
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_PORT: ${{ secrets.EC2_PORT }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-        run: |
-          ssh -i ~/.ssh/finvibe_batch_key -p "${EC2_PORT:-22}" "${EC2_USER}@${EC2_HOST}" <<'EOF'
-            set -e
-            mkdir -p "$HOME/finvibe-batch"
+            docker network inspect "${PRIMARY_DOCKER_NETWORK}" >/dev/null 2>&1 || {
+              echo "Primary docker network not found: ${PRIMARY_DOCKER_NETWORK}"
+              exit 1
+            }
 
-            if [ -f "$HOME/finvibe-batch/app.pid" ] && kill -0 "$(cat "$HOME/finvibe-batch/app.pid")" 2>/dev/null; then
-              kill "$(cat "$HOME/finvibe-batch/app.pid")"
-              sleep 10
+            if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+              docker rm -f "${CONTAINER_NAME}"
             fi
 
-            pgrep -f 'finvibe-batch/app.jar' | xargs -r kill
-            sleep 5
+            docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --restart unless-stopped \
+              --network "${PRIMARY_DOCKER_NETWORK}" \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e LOG_JSON_PATH="${CONTAINER_LOG_JSON_PATH}" \
+              -e DB_URL="${DB_URL}" \
+              -e DB_USERNAME="${DB_USERNAME}" \
+              -e DB_PASSWORD="${DB_PASSWORD}" \
+              -e REDIS_HOST="${REDIS_HOST}" \
+              -e REDIS_PORT="${REDIS_PORT}" \
+              -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
+              -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS}" \
+              -e GEMINI_API_KEY="${GEMINI_API_KEY}" \
+              -e GEMINI_MODEL_NAME="gemini-2.5-flash" \
+              -e GEMINI_HIGH_MODEL_NAME="gemini-2.5-flash" \
+              -e KIS_USER_ID="${KIS_USER_ID}" \
+              -e KIS_API_KEY_1="${KIS_API_KEY_1}" \
+              -e KIS_API_SECRET_1="${KIS_API_SECRET_1}" \
+              -e KIS_API_KEY_2="${KIS_API_KEY_2}" \
+              -e KIS_API_SECRET_2="${KIS_API_SECRET_2}" \
+              -e KIS_API_KEY_3="${KIS_API_KEY_3}" \
+              -e KIS_API_SECRET_3="${KIS_API_SECRET_3}" \
+              -e KIS_BASE_URL="${KIS_BASE_URL}" \
+              -e KIS_WEBSOCKET_URL="${KIS_WEBSOCKET_URL}" \
+              -v "${LOG_DIR_HOST}:/app/logs" \
+              "${IMAGE_REF}"
 
-            nohup java -jar "$HOME/finvibe-batch/app.jar" \
-              --spring.profiles.active=prod \
-              > "$HOME/finvibe-batch/app.log" 2>&1 < /dev/null &
+            if [ -n "${SECONDARY_DOCKER_NETWORK}" ]; then
+              docker network inspect "${SECONDARY_DOCKER_NETWORK}" >/dev/null 2>&1 || {
+                echo "Secondary docker network not found: ${SECONDARY_DOCKER_NETWORK}"
+                exit 1
+              }
 
-            echo $! > "$HOME/finvibe-batch/app.pid"
-          EOF
+              if ! docker network connect "${SECONDARY_DOCKER_NETWORK}" "${CONTAINER_NAME}"; then
+                echo "Failed to connect container to secondary network"
+                docker logs "${CONTAINER_NAME}" || true
+                exit 1
+              fi
+            fi
+
+            for i in $(seq 1 24); do
+              if ! docker ps --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}\$"; then
+                echo "Container exited during startup"
+                docker logs "${CONTAINER_NAME}" || true
+                exit 1
+              fi
+
+              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${CONTAINER_NAME}")"
+              if [ "${health_status}" = "healthy" ] || [ "${health_status}" = "none" ]; then
+                echo "Deployment healthy"
+                exit 0
+              fi
+
+              echo "Waiting for container health (${i}/24)..."
+              sleep 5
+            done
+
+            echo "Container did not become healthy in time"
+            docker logs "${CONTAINER_NAME}" || true
+            exit 1

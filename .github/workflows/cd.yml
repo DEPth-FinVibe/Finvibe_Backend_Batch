@@ -9,7 +9,7 @@ on:
 env:
   IMAGE_NAME: ${{ vars.DOCKER_IMAGE_NAME || format('{0}/finvibe-backend-batch', secrets.DOCKERHUB_USERNAME) }}
   CONTAINER_NAME: ${{ vars.DEPLOY_CONTAINER_NAME || 'finvibe-batch' }}
-  LOG_DIR_HOST: ${{ vars.LOG_DIR_HOST || '/var/log/finvibe-backend-batch' }}
+  LOG_DIR_HOST: ${{ vars.LOG_DIR_HOST || '' }}
   PRIMARY_DOCKER_NETWORK: ${{ vars.PRIMARY_DOCKER_NETWORK || 'infra_bridge' }}
   SECONDARY_DOCKER_NETWORK: ${{ vars.SECONDARY_DOCKER_NETWORK || '' }}
 
@@ -93,6 +93,10 @@ jobs:
                 exit 1
               fi
             done
+
+            if [ -z "${LOG_DIR_HOST}" ]; then
+              LOG_DIR_HOST="$HOME/finvibe-backend-batch/logs"
+            fi
 
             IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
             CONTAINER_LOG_JSON_PATH="/app/logs/application-json.log"

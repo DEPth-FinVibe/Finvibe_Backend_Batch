@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -66,7 +67,7 @@ public class XpService implements XpCommandUseCase {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void refreshUserRankingSnapshots() {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         refreshUserRankingSnapshotByPeriod(RankingPeriod.WEEKLY, now);

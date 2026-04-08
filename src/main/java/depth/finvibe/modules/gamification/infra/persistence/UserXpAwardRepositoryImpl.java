@@ -47,25 +47,30 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
     public List<UserPeriodXp> findUserPeriodXpRankingBetween(
             LocalDateTime startInclusive,
             LocalDateTime endExclusive,
-            long offset,
+            Long lastXp,
+            UUID lastUserId,
             int limit) {
         QUserXpAward userXpAward = QUserXpAward.userXpAward;
+        var totalXp = userXpAward.xp.value.sum();
 
         List<Tuple> rows = jpaQueryFactory
-                .select(userXpAward.userId, userXpAward.xp.value.sum())
+                .select(userXpAward.userId, totalXp)
                 .from(userXpAward)
                 .where(userXpAward.createdAt.goe(startInclusive)
                         .and(userXpAward.createdAt.lt(endExclusive)))
                 .groupBy(userXpAward.userId)
-                .orderBy(userXpAward.xp.value.sum().desc(), userXpAward.userId.asc())
-                .offset(offset)
+                .having(lastXp == null || lastUserId == null
+                        ? null
+                        : totalXp.lt(lastXp)
+                                .or(totalXp.eq(lastXp).and(userXpAward.userId.gt(lastUserId))))
+                .orderBy(totalXp.desc(), userXpAward.userId.asc())
                 .limit(limit)
                 .fetch();
 
         return rows.stream()
                 .map(tuple -> new UserPeriodXp(
                         tuple.get(userXpAward.userId),
-                        tuple.get(userXpAward.xp.value.sum())))
+                        tuple.get(totalXp)))
                 .toList();
     }
 

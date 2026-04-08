@@ -174,22 +174,31 @@ public class XpService implements XpCommandUseCase {
         LocalDateTime previousStart = getPreviousStart(rankingPeriod, currentStart);
         userXpRankingSnapshotRepository.deleteSnapshots(rankingPeriod, currentStart.toLocalDate());
 
-        long offset = 0L;
+        Long lastXp = null;
+        UUID lastUserId = null;
         int ranking = 1;
         while (true) {
             List<UserXpAwardRepository.UserPeriodXp> rankedUsers = userXpAwardRepository
-                    .findUserPeriodXpRankingBetween(currentStart, currentEnd, offset, rankingSnapshotChunkSize);
+                    .findUserPeriodXpRankingBetween(
+                            currentStart,
+                            currentEnd,
+                            lastXp,
+                            lastUserId,
+                            rankingSnapshotChunkSize);
 
             if (rankedUsers.isEmpty()) {
                 return;
             }
+
+            UserXpAwardRepository.UserPeriodXp lastRow = rankedUsers.getLast();
+            lastXp = lastRow.xp();
+            lastUserId = lastRow.userId();
 
             List<UserXpAwardRepository.UserPeriodXp> uniqueRankedUsers = deduplicateRankedUsers(
                     rankedUsers,
                     rankingPeriod,
                     currentStart.toLocalDate());
             if (uniqueRankedUsers.isEmpty()) {
-                offset += rankedUsers.size();
                 continue;
             }
 
@@ -227,7 +236,6 @@ public class XpService implements XpCommandUseCase {
             }
 
             userXpRankingSnapshotRepository.saveAll(snapshots);
-            offset += rankedUsers.size();
         }
     }
 

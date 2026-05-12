@@ -140,13 +140,13 @@ public class ScheduledBatchLauncher {
 		scheduledBatchJobSupport.launch(rewardMonthlyTopOnePercentBadgeJob);
 	}
 
-	@Scheduled(cron = "0 5 0 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "${batch.schedule.user-profit-snapshot.cron:0 5 * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	@SchedulerLock(name = "userProfitSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void saveUserProfitDailySnapshot() {
 		scheduledBatchJobSupport.launch(saveUserProfitDailySnapshotJob);
 	}
 
-	@Scheduled(cron = "0 7 0 * * *", zone = "Asia/Seoul")
+	@Scheduled(cron = "${batch.schedule.portfolio-performance-snapshot.cron:0 7 * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	@SchedulerLock(name = "portfolioPerformanceSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void savePortfolioPerformanceDailySnapshot() {
 		scheduledBatchJobSupport.launch(savePortfolioPerformanceDailySnapshotJob);

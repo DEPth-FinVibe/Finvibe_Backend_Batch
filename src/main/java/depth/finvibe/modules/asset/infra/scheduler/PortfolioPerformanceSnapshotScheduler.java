@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +19,19 @@ public class PortfolioPerformanceSnapshotScheduler {
 
   private final PortfolioPerformanceSnapshotService portfolioPerformanceSnapshotService;
 
-  public void saveDailySnapshot() {
-    LocalDate snapshotDate = LocalDate.now(KST).minusDays(1);
+  @Value("${batch.snapshot.portfolio-performance.offset-days:0}")
+  private long snapshotOffsetDays;
+
+  public void saveScheduledSnapshot() {
+    LocalDate snapshotDate = LocalDate.now(KST).minusDays(snapshotOffsetDays);
     portfolioPerformanceSnapshotService.saveDailySnapshot(snapshotDate);
+  }
+
+  public void saveSnapshot(LocalDate snapshotDate) {
+    portfolioPerformanceSnapshotService.saveDailySnapshot(snapshotDate);
+  }
+
+  public void saveCurrentSnapshot() {
+    saveSnapshot(LocalDate.now(KST));
   }
 }

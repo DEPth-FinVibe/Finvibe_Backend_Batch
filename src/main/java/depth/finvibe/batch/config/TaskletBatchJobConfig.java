@@ -245,7 +245,7 @@ public class TaskletBatchJobConfig {
 			"saveUserProfitDailySnapshotJob",
 			jobRepository,
 			transactionManager,
-			userProfitSnapshotScheduler::saveDailySnapshot
+			userProfitSnapshotScheduler::saveScheduledSnapshot
 		);
 	}
 
@@ -259,7 +259,7 @@ public class TaskletBatchJobConfig {
 			"savePortfolioPerformanceDailySnapshotJob",
 			jobRepository,
 			transactionManager,
-			portfolioPerformanceSnapshotScheduler::saveDailySnapshot
+			portfolioPerformanceSnapshotScheduler::saveScheduledSnapshot
 		);
 	}
 

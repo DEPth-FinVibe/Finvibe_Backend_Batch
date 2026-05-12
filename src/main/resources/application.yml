@@ -41,6 +41,21 @@ batch:
     portfolio-snapshot-size: 500
     user-ranking-snapshot-size: 500
     news-discussion-sync-size: 500
+  schedule:
+    zone: ${BATCH_SCHEDULE_ZONE:Asia/Seoul}
+    user-profit-snapshot:
+      cron: ${BATCH_SCHEDULE_USER_PROFIT_SNAPSHOT_CRON:0 5 * * * *}
+    portfolio-performance-snapshot:
+      cron: ${BATCH_SCHEDULE_PORTFOLIO_PERFORMANCE_SNAPSHOT_CRON:0 7 * * * *}
+  snapshot:
+    user-profit:
+      offset-days: ${BATCH_SNAPSHOT_USER_PROFIT_OFFSET_DAYS:0}
+    portfolio-performance:
+      offset-days: ${BATCH_SNAPSHOT_PORTFOLIO_PERFORMANCE_OFFSET_DAYS:0}
+  manual-trigger:
+    enabled: ${BATCH_MANUAL_TRIGGER_ENABLED:false}
+    jobs: ${BATCH_MANUAL_TRIGGER_JOBS:}
+    snapshot-date: ${BATCH_MANUAL_TRIGGER_SNAPSHOT_DATE:}
 
 resilience4j:
   circuitbreaker:

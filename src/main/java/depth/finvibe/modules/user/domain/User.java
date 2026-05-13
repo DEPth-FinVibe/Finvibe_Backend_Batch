@@ -5,8 +5,6 @@ import java.util.UUID;
 import depth.finvibe.modules.user.domain.vo.*;
 import jakarta.persistence.*;
 import lombok.Builder;
-import org.hibernate.annotations.Generated;
-import org.hibernate.generator.EventType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import depth.finvibe.modules.user.domain.enums.UserRole;
@@ -28,19 +26,17 @@ import lombok.experimental.SuperBuilder;
 })
 public class User extends TimeStampedBaseEntity {
     @Id
-    @Builder.Default
-    private UUID id = UUID.randomUUID();
-
-    @Generated(event = EventType.INSERT)
-    @Column(
-        name = "internal_user_id",
-        nullable = false,
-        unique = true,
-        insertable = false,
-        updatable = false,
-        columnDefinition = "BIGINT AUTO_INCREMENT"
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long internalUserId;
+
+    @Builder.Default
+    @Column(
+        name = "external_user_id",
+        nullable = false,
+        unique = true
+    )
+    private UUID externalUserId = UUID.randomUUID();
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "login_id"))
@@ -66,7 +62,7 @@ public class User extends TimeStampedBaseEntity {
 
     public static User create(LoginId loginId, PasswordHash password, PersonalDetails personalDetails) {
         return User.builder()
-                .id(UUID.randomUUID())
+                .externalUserId(UUID.randomUUID())
                 .loginId(loginId)
                 .passwordHash(password)
                 .personalDetails(personalDetails)
@@ -78,7 +74,7 @@ public class User extends TimeStampedBaseEntity {
         String randomPassword = UUID.randomUUID().toString().replaceAll("-", "").substring(0, 12);
 
         return User.builder()
-                .id(UUID.randomUUID())
+                .externalUserId(UUID.randomUUID())
                 .oauthInfo(oAuthInfo)
                 .passwordHash(PasswordHash.create(randomPassword, passwordEncoder))
                 .personalDetails(personalDetails)
@@ -123,8 +119,12 @@ public class User extends TimeStampedBaseEntity {
     }
 
     public void validateUpdatable(UUID requesterId, UserRole requesterRole) {
-        if (!this.id.equals(requesterId) && requesterRole != UserRole.ADMIN) {
+        if (!this.externalUserId.equals(requesterId) && requesterRole != UserRole.ADMIN) {
             throw new DomainException(UserErrorCode.UNAUTHORIZED_USER_UPDATE);
         }
+    }
+
+    public UUID getId() {
+        return externalUserId;
     }
 }

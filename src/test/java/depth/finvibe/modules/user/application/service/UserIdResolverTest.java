@@ -44,7 +44,7 @@ class UserIdResolverTest {
     void fallsBackToUserRepositoryAndCachesResolvedInternalUserId() {
         UUID externalUserId = UUID.randomUUID();
         User user = User.builder()
-            .id(externalUserId)
+            .externalUserId(externalUserId)
             .internalUserId(42L)
             .build();
         UserIdResolver resolver = new UserIdResolver(userIdCacheRepository, userRepository);

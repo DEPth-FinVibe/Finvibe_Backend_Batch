@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
@@ -49,7 +50,7 @@ class PortfolioPerformanceSnapshotServiceTest {
         when(portfolioGroupRepository.findPortfolioIdsAfter(null, 0)).thenReturn(List.of(1L));
         when(portfolioGroupRepository.findPortfolioIdsAfter(1L, 0)).thenReturn(List.of());
         when(portfolioGroupRepository.findAllWithAssetsByIds(List.of(1L))).thenReturn(List.of(portfolio));
-        when(userIdResolver.resolveInternalUserId(externalUserId)).thenReturn(42L);
+        when(userIdResolver.resolveInternalUserIdIfPresent(externalUserId)).thenReturn(Optional.of(42L));
 
         service.saveDailySnapshot(LocalDate.of(2026, 5, 13));
 

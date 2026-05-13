@@ -3,8 +3,10 @@ package depth.finvibe.modules.asset.application;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,6 +22,7 @@ import depth.finvibe.modules.user.application.service.UserIdResolver;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PortfolioPerformanceSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final PortfolioPerformanceSnapshotRepository portfolioPerformanceSnapshotRepository;
@@ -52,13 +55,21 @@ public class PortfolioPerformanceSnapshotService {
   private void saveSnapshotChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
     List<PortfolioPerformanceSnapshotDaily> snapshots = portfolios.stream()
       .filter(portfolio -> portfolio.getId() != null)
-      .map(portfolio -> toSnapshot(portfolio, snapshotDate))
+      .map(portfolio -> toSnapshotIfResolvable(portfolio, snapshotDate))
+      .flatMap(Optional::stream)
       .toList();
 
     portfolioPerformanceSnapshotRepository.saveAll(snapshots);
   }
 
-  private PortfolioPerformanceSnapshotDaily toSnapshot(PortfolioGroup portfolio, LocalDate snapshotDate) {
+  private Optional<PortfolioPerformanceSnapshotDaily> toSnapshotIfResolvable(PortfolioGroup portfolio, LocalDate snapshotDate) {
+    Optional<Long> internalUserId = userIdResolver.resolveInternalUserIdIfPresent(portfolio.getUserId());
+    if (internalUserId.isEmpty()) {
+      log.warn("Skip portfolio performance snapshot for unresolved user. portfolioId={}, userId={}, snapshotDate={}",
+        portfolio.getId(), portfolio.getUserId(), snapshotDate);
+      return Optional.empty();
+    }
+
     PortfolioValuation valuation = portfolio.getValuation();
     BigDecimal totalCurrentValue = BigDecimal.ZERO;
     BigDecimal totalProfitLoss = BigDecimal.ZERO;
@@ -70,13 +81,13 @@ public class PortfolioPerformanceSnapshotService {
       totalReturnRate = valuation.getTotalReturnRate() != null ? valuation.getTotalReturnRate() : BigDecimal.ZERO;
     }
 
-    return PortfolioPerformanceSnapshotDaily.create(
+    return Optional.of(PortfolioPerformanceSnapshotDaily.create(
       new PortfolioPerformanceSnapshotDailyId(portfolio.getId(), snapshotDate),
-      userIdResolver.resolveInternalUserId(portfolio.getUserId()),
+      internalUserId.get(),
       portfolio.getName(),
       totalCurrentValue,
       totalProfitLoss,
       totalReturnRate
-    );
+    ));
   }
 }

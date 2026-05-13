@@ -9,6 +9,8 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitRankingScheduler;
@@ -147,7 +149,8 @@ public class TaskletBatchJobConfig {
 			"executeBatchPriceUpdateJob",
 			jobRepository,
 			transactionManager,
-			batchPriceUpdateScheduler::executeBatchPriceUpdate
+			batchPriceUpdateScheduler::executeBatchPriceUpdate,
+			false
 		);
 	}
 
@@ -161,7 +164,8 @@ public class TaskletBatchJobConfig {
 			"cacheIndexMinuteCandlesJob",
 			jobRepository,
 			transactionManager,
-			indexMinuteCandleCacheScheduler::cacheIndexMinuteCandles
+			indexMinuteCandleCacheScheduler::cacheIndexMinuteCandles,
+			false
 		);
 	}
 
@@ -175,7 +179,8 @@ public class TaskletBatchJobConfig {
 			"ensureNextMonthHolidayCalendarJob",
 			jobRepository,
 			transactionManager,
-			holidayCalendarScheduler::ensureNextMonthHolidayCalendar
+			holidayCalendarScheduler::ensureNextMonthHolidayCalendar,
+			false
 		);
 	}
 
@@ -189,7 +194,8 @@ public class TaskletBatchJobConfig {
 			"executeStockRankingUpdateJob",
 			jobRepository,
 			transactionManager,
-			stockRankingUpdateScheduler::executeStockRankingUpdate
+			stockRankingUpdateScheduler::executeStockRankingUpdate,
+			false
 		);
 	}
 
@@ -203,7 +209,8 @@ public class TaskletBatchJobConfig {
 			"executeStockBulkUpsertJob",
 			jobRepository,
 			transactionManager,
-			stockBulkUpsertScheduler::executeStockBulkUpsert
+			stockBulkUpsertScheduler::executeStockBulkUpsert,
+			false
 		);
 	}
 
@@ -269,12 +276,30 @@ public class TaskletBatchJobConfig {
 		PlatformTransactionManager transactionManager,
 		Runnable action
 	) {
-		Step step = new StepBuilder(jobName + "Step", jobRepository)
+		return taskletJob(jobName, jobRepository, transactionManager, action, true);
+	}
+
+	private Job taskletJob(
+		String jobName,
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		Runnable action,
+		boolean transactional
+	) {
+		StepBuilder stepBuilder = new StepBuilder(jobName + "Step", jobRepository);
+		var taskletStepBuilder = stepBuilder
 			.tasklet((contribution, chunkContext) -> {
 				action.run();
 				return RepeatStatus.FINISHED;
-			}, transactionManager)
-			.build();
+			}, transactionManager);
+
+		if (!transactional) {
+			DefaultTransactionAttribute transactionAttribute = new DefaultTransactionAttribute();
+			transactionAttribute.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+			taskletStepBuilder.transactionAttribute(transactionAttribute);
+		}
+
+		Step step = taskletStepBuilder.build();
 
 		return new JobBuilder(jobName, jobRepository)
 			.start(step)

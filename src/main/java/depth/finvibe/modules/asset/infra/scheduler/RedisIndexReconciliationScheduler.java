@@ -102,11 +102,16 @@ public class RedisIndexReconciliationScheduler {
 	private int reconcilePortfolio(PortfolioGroup portfolio, Map<Long, Set<Long>> dbStockToPortfolios) {
 		int fixes = 0;
 		Long portfolioId = portfolio.getId();
+		java.util.UUID portfolioOwner = portfolio.getUserId();
+		if (portfolioOwner == null) {
+			log.warn("Skip Redis index reconciliation for portfolio with null userId. portfolioId={}", portfolioId);
+			return fixes;
+		}
 
 		// 1. portfolio:owner 검증
 		java.util.UUID redisOwner = portfolioOwnerRedisRepository.get(portfolioId);
-		if (!portfolio.getUserId().equals(redisOwner)) {
-			portfolioOwnerRedisRepository.set(portfolioId, portfolio.getUserId());
+		if (!portfolioOwner.equals(redisOwner)) {
+			portfolioOwnerRedisRepository.set(portfolioId, portfolioOwner);
 			fixes++;
 		}
 

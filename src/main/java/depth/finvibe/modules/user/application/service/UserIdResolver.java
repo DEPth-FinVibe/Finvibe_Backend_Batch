@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,18 +21,29 @@ public class UserIdResolver {
     private final UserRepository userRepository;
 
     public Long resolveInternalUserId(UUID externalUserId) {
-        return userIdCacheRepository.findInternalUserIdByExternalUserId(externalUserId)
-            .orElseGet(() -> loadAndCacheInternalUserId(externalUserId));
+        return resolveInternalUserIdIfPresent(externalUserId)
+            .orElseThrow(() -> new DomainException(UserErrorCode.USER_NOT_FOUND));
     }
 
-    private Long loadAndCacheInternalUserId(UUID externalUserId) {
-        User user = userRepository.findById(externalUserId)
-            .orElseThrow(() -> new DomainException(UserErrorCode.USER_NOT_FOUND));
+    public Optional<Long> resolveInternalUserIdIfPresent(UUID externalUserId) {
+        if (externalUserId == null) {
+            return Optional.empty();
+        }
+        return userIdCacheRepository.findInternalUserIdByExternalUserId(externalUserId)
+            .or(() -> loadAndCacheInternalUserIdIfPresent(externalUserId));
+    }
+
+    private Optional<Long> loadAndCacheInternalUserIdIfPresent(UUID externalUserId) {
+        Optional<User> foundUser = userRepository.findById(externalUserId);
+        if (foundUser.isEmpty()) {
+            return Optional.empty();
+        }
+        User user = foundUser.get();
         Long internalUserId = user.getInternalUserId();
         if (internalUserId == null) {
-            throw new DomainException(UserErrorCode.USER_NOT_FOUND);
+            return Optional.empty();
         }
         userIdCacheRepository.save(externalUserId, internalUserId);
-        return internalUserId;
+        return Optional.of(internalUserId);
     }
 }

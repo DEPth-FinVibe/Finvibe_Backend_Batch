@@ -13,6 +13,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -30,6 +31,7 @@ import depth.finvibe.modules.user.application.service.UserIdResolver;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserProfitSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final UserProfitSnapshotRepository userProfitSnapshotRepository;
@@ -62,12 +64,19 @@ public class UserProfitSnapshotService {
 
   private void processPortfolioChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
     Map<UUID, List<PortfolioGroup>> portfoliosByUser = portfolios.stream()
+      .filter(portfolio -> portfolio.getUserId() != null)
       .collect(Collectors.groupingBy(PortfolioGroup::getUserId));
     Map<UUID, Long> internalUserIdsByExternalUserId = portfoliosByUser.keySet().stream()
+      .map(externalUserId -> Map.entry(externalUserId, userIdResolver.resolveInternalUserIdIfPresent(externalUserId)))
+      .filter(entry -> entry.getValue().isPresent())
       .collect(Collectors.toMap(
-        externalUserId -> externalUserId,
-        userIdResolver::resolveInternalUserId
+        Map.Entry::getKey,
+        entry -> entry.getValue().get()
       ));
+    int skippedUserCount = portfoliosByUser.size() - internalUserIdsByExternalUserId.size();
+    if (skippedUserCount > 0) {
+      log.warn("Skip user profit snapshots for unresolved users. skippedUserCount={}, snapshotDate={}", skippedUserCount, snapshotDate);
+    }
     Set<Long> usersWithPositiveProfitHistory = userProfitSnapshotRepository.findUserIdsWithPositiveProfitSnapshot(
       internalUserIdsByExternalUserId.values(),
       BigDecimal.ZERO,
@@ -76,9 +85,12 @@ public class UserProfitSnapshotService {
 
     List<UserProfitSnapshotDaily> snapshots = new ArrayList<>();
     for (Map.Entry<UUID, List<PortfolioGroup>> entry : portfoliosByUser.entrySet()) {
+      Long internalUserId = internalUserIdsByExternalUserId.get(entry.getKey());
+      if (internalUserId == null) {
+        continue;
+      }
       UserProfitSummary summary = calculateUserProfitSummary(entry.getValue());
       if (summary.hasAssets()) {
-        Long internalUserId = internalUserIdsByExternalUserId.get(entry.getKey());
         UserProfitSnapshotDailyId id = new UserProfitSnapshotDailyId(internalUserId, snapshotDate);
         publishFirstProfitBadgeIfEligible(entry.getKey(), internalUserId, summary.totalProfitLoss(), usersWithPositiveProfitHistory);
         snapshots.add(UserProfitSnapshotDaily.create(

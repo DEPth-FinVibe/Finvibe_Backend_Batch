@@ -1,6 +1,7 @@
 package depth.finvibe.modules.asset.infra.persistence;
 
 import java.util.List;
+import java.util.UUID;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,31 @@ public class PortfolioGroupQueryRepository {
                 .leftJoin(portfolioGroup.assets, asset).fetchJoin()
                 .where(portfolioGroup.id.in(portfolioIds))
                 .orderBy(portfolioGroup.id.asc())
+                .distinct()
+                .fetch();
+    }
+
+    public List<UUID> findUserIdsAfter(UUID lastUserId, int limit) {
+        return queryFactory
+                .select(portfolioGroup.userId)
+                .distinct()
+                .from(portfolioGroup)
+                .where(lastUserId == null ? null : portfolioGroup.userId.gt(lastUserId))
+                .orderBy(portfolioGroup.userId.asc())
+                .limit(limit)
+                .fetch();
+    }
+
+    public List<PortfolioGroup> findAllWithAssetsByUserIds(List<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .selectFrom(portfolioGroup)
+                .leftJoin(portfolioGroup.assets, asset).fetchJoin()
+                .where(portfolioGroup.userId.in(userIds))
+                .orderBy(portfolioGroup.userId.asc(), portfolioGroup.id.asc())
                 .distinct()
                 .fetch();
     }

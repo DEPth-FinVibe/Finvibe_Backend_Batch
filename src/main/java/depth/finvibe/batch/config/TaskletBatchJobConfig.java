@@ -15,6 +15,7 @@ import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitRankingScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitSnapshotScheduler;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationWarmUpScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.ValuationWriteBackScheduler;
 import depth.finvibe.modules.gamification.infra.scheduler.GamificationScheduler;
 import depth.finvibe.modules.market.infra.scheduler.BatchPriceUpdateScheduler;
@@ -258,6 +259,33 @@ public class TaskletBatchJobConfig {
 	}
 
 	@Bean
+	Job executeValuationWarmUpJob(
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		ValuationWarmUpScheduler valuationWarmUpScheduler
+	) {
+		Step portfolioStateWarmUpStep = taskletStep(
+			"portfolioStateWarmUpStep",
+			jobRepository,
+			transactionManager,
+			valuationWarmUpScheduler::executePortfolioStateWarmUp,
+			false
+		);
+		Step userStateWarmUpStep = taskletStep(
+			"userStateWarmUpStep",
+			jobRepository,
+			transactionManager,
+			valuationWarmUpScheduler::executeUserStateWarmUp,
+			false
+		);
+
+		return new JobBuilder("executeValuationWarmUpJob", jobRepository)
+			.start(portfolioStateWarmUpStep)
+			.next(userStateWarmUpStep)
+			.build();
+	}
+
+	@Bean
 	Job executeValuationWriteBackJob(
 		JobRepository jobRepository,
 		PlatformTransactionManager transactionManager,
@@ -302,7 +330,21 @@ public class TaskletBatchJobConfig {
 		Runnable action,
 		boolean transactional
 	) {
-		StepBuilder stepBuilder = new StepBuilder(jobName + "Step", jobRepository);
+		Step step = taskletStep(jobName + "Step", jobRepository, transactionManager, action, transactional);
+
+		return new JobBuilder(jobName, jobRepository)
+			.start(step)
+			.build();
+	}
+
+	private Step taskletStep(
+		String stepName,
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		Runnable action,
+		boolean transactional
+	) {
+		StepBuilder stepBuilder = new StepBuilder(stepName, jobRepository);
 		var taskletStepBuilder = stepBuilder
 			.tasklet((contribution, chunkContext) -> {
 				action.run();
@@ -315,10 +357,6 @@ public class TaskletBatchJobConfig {
 			taskletStepBuilder.transactionAttribute(transactionAttribute);
 		}
 
-		Step step = taskletStepBuilder.build();
-
-		return new JobBuilder(jobName, jobRepository)
-			.start(step)
-			.build();
+		return taskletStepBuilder.build();
 	}
 }

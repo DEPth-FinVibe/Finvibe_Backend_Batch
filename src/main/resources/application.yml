@@ -61,6 +61,8 @@ batch:
     portfolio-size: ${BATCH_WRITE_BACK_PORTFOLIO_SIZE:500}
     user-size: ${BATCH_WRITE_BACK_USER_SIZE:500}
     deletion-size: ${BATCH_WRITE_BACK_DELETION_SIZE:500}
+  warm-up:
+    chunk-size: ${BATCH_WARM_UP_CHUNK_SIZE:1000}
 
 resilience4j:
   circuitbreaker:

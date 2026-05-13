@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitSnapshotScheduler;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationWarmUpScheduler;
 
 @Slf4j
 @Component
@@ -23,6 +24,7 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 
 	private final UserProfitSnapshotScheduler userProfitSnapshotScheduler;
 	private final PortfolioPerformanceSnapshotScheduler portfolioPerformanceSnapshotScheduler;
+	private final ValuationWarmUpScheduler valuationWarmUpScheduler;
 
 	@Value("${batch.manual-trigger.jobs:}")
 	private String manualTriggerJobs;
@@ -42,7 +44,11 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 	}
 
 	private void trigger(String job, LocalDate snapshotDate) {
-		switch (job) {
+			switch (job) {
+			case "valuation-warm-up" -> {
+				log.info("Manually triggering valuation warm-up");
+				valuationWarmUpScheduler.executeWarmUp();
+			}
 			case "user-profit-snapshot" -> {
 				log.info("Manually triggering user profit snapshot for date {}", snapshotDate);
 				userProfitSnapshotScheduler.saveSnapshot(snapshotDate);
@@ -52,7 +58,8 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 				portfolioPerformanceSnapshotScheduler.saveSnapshot(snapshotDate);
 			}
 			case "all" -> {
-				log.info("Manually triggering all profit snapshot jobs for date {}", snapshotDate);
+				log.info("Manually triggering all manual batch jobs for date {}", snapshotDate);
+				valuationWarmUpScheduler.executeWarmUp();
 				userProfitSnapshotScheduler.saveSnapshot(snapshotDate);
 				portfolioPerformanceSnapshotScheduler.saveSnapshot(snapshotDate);
 			}

@@ -2,6 +2,7 @@ package depth.finvibe.modules.asset.application.port.out;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import depth.finvibe.modules.asset.domain.PortfolioGroup;
 
@@ -17,6 +18,10 @@ public interface PortfolioGroupRepository {
     List<Long> findPortfolioIdsAfter(Long lastPortfolioId, int limit);
 
     List<PortfolioGroup> findAllWithAssetsByIds(List<Long> portfolioIds);
+
+    List<UUID> findUserIdsAfter(UUID lastUserId, int limit);
+
+    List<PortfolioGroup> findAllWithAssetsByUserIds(List<UUID> userIds);
 
     void delete(PortfolioGroup existing);
 }

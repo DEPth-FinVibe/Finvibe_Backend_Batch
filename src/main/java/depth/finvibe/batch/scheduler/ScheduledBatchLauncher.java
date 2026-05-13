@@ -49,6 +49,8 @@ public class ScheduledBatchLauncher {
 	private final Job saveUserProfitDailySnapshotJob;
 	@Qualifier("savePortfolioPerformanceDailySnapshotJob")
 	private final Job savePortfolioPerformanceDailySnapshotJob;
+	@Qualifier("executeValuationWriteBackJob")
+	private final Job executeValuationWriteBackJob;
 
 	@Scheduled(cron = "0 0 0 * * MON", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_updateWeeklySquadRanking", lockAtMostFor = "PT30M")
@@ -150,5 +152,11 @@ public class ScheduledBatchLauncher {
 	@SchedulerLock(name = "portfolioPerformanceSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void savePortfolioPerformanceDailySnapshot() {
 		scheduledBatchJobSupport.launch(savePortfolioPerformanceDailySnapshotJob);
+	}
+
+	@Scheduled(cron = "${batch.schedule.valuation-write-back.cron:0/30 * * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
+	@SchedulerLock(name = "valuationWriteBack", lockAtMostFor = "PT1M", lockAtLeastFor = "PT1S")
+	public void executeValuationWriteBack() {
+		scheduledBatchJobSupport.launch(executeValuationWriteBackJob);
 	}
 }

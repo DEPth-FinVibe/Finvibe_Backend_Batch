@@ -15,6 +15,7 @@ import org.springframework.transaction.interceptor.DefaultTransactionAttribute;
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitRankingScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitSnapshotScheduler;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationWriteBackScheduler;
 import depth.finvibe.modules.gamification.infra.scheduler.GamificationScheduler;
 import depth.finvibe.modules.market.infra.scheduler.BatchPriceUpdateScheduler;
 import depth.finvibe.modules.market.infra.scheduler.ClosingPriceCleanupScheduler;
@@ -253,6 +254,21 @@ public class TaskletBatchJobConfig {
 			jobRepository,
 			transactionManager,
 			userProfitSnapshotScheduler::saveScheduledSnapshot
+		);
+	}
+
+	@Bean
+	Job executeValuationWriteBackJob(
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		ValuationWriteBackScheduler valuationWriteBackScheduler
+	) {
+		return taskletJob(
+			"executeValuationWriteBackJob",
+			jobRepository,
+			transactionManager,
+			valuationWriteBackScheduler::executeWriteBack,
+			false
 		);
 	}
 

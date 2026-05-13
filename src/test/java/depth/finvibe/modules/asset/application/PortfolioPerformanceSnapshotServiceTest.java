@@ -12,8 +12,9 @@ import java.util.UUID;
 
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
 import depth.finvibe.modules.asset.application.port.out.PortfolioPerformanceSnapshotRepository;
+import depth.finvibe.modules.asset.application.port.out.PortfolioValuationRepository;
 import depth.finvibe.modules.asset.domain.PortfolioGroup;
-import depth.finvibe.modules.asset.domain.PortfolioValuation;
+import depth.finvibe.modules.asset.domain.PortfolioValuationReadModel;
 import depth.finvibe.modules.user.application.service.UserIdResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,9 @@ class PortfolioPerformanceSnapshotServiceTest {
     private PortfolioPerformanceSnapshotRepository portfolioPerformanceSnapshotRepository;
 
     @Mock
+    private PortfolioValuationRepository portfolioValuationRepository;
+
+    @Mock
     private UserIdResolver userIdResolver;
 
     @Test
@@ -39,16 +43,25 @@ class PortfolioPerformanceSnapshotServiceTest {
             .id(1L)
             .userId(externalUserId)
             .name("테스트 포트폴리오")
-            .valuation(PortfolioValuation.empty())
             .build();
+        PortfolioValuationReadModel valuation = PortfolioValuationReadModel.create(
+            1L,
+            1000L,
+            1100L,
+            10.0,
+            1L,
+            null
+        );
         PortfolioPerformanceSnapshotService service = new PortfolioPerformanceSnapshotService(
             portfolioGroupRepository,
             portfolioPerformanceSnapshotRepository,
+            portfolioValuationRepository,
             userIdResolver
         );
 
-        when(portfolioGroupRepository.findPortfolioIdsAfter(null, 0)).thenReturn(List.of(1L));
-        when(portfolioGroupRepository.findPortfolioIdsAfter(1L, 0)).thenReturn(List.of());
+        when(portfolioValuationRepository.findActivePortfolioIdsAfter(null, 0)).thenReturn(List.of(1L));
+        when(portfolioValuationRepository.findActivePortfolioIdsAfter(1L, 0)).thenReturn(List.of());
+        when(portfolioValuationRepository.findActiveByPortfolioIds(List.of(1L))).thenReturn(List.of(valuation));
         when(portfolioGroupRepository.findAllWithAssetsByIds(List.of(1L))).thenReturn(List.of(portfolio));
         when(userIdResolver.resolveInternalUserIdIfPresent(externalUserId)).thenReturn(Optional.of(42L));
 

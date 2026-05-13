@@ -1,16 +1,12 @@
 package depth.finvibe.modules.asset.application;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,11 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
 import depth.finvibe.modules.asset.application.port.out.UserProfitSnapshotRepository;
-import depth.finvibe.modules.asset.domain.PortfolioGroup;
+import depth.finvibe.modules.asset.application.port.out.UserValuationRepository;
 import depth.finvibe.modules.asset.domain.UserProfitSnapshotDaily;
 import depth.finvibe.modules.asset.domain.UserProfitSnapshotDailyId;
+import depth.finvibe.modules.asset.domain.UserValuation;
 import depth.finvibe.common.investment.application.port.out.GamificationEventProducer;
 import depth.finvibe.common.investment.dto.Badge;
 import depth.finvibe.common.investment.dto.RewardBadgeEvent;
@@ -33,13 +29,13 @@ import depth.finvibe.modules.user.application.service.UserIdResolver;
 @RequiredArgsConstructor
 @Slf4j
 public class UserProfitSnapshotService {
-  private final PortfolioGroupRepository portfolioGroupRepository;
   private final UserProfitSnapshotRepository userProfitSnapshotRepository;
+  private final UserValuationRepository userValuationRepository;
   private final GamificationEventProducer gamificationEventProducer;
   private final UserIdResolver userIdResolver;
 
-  @Value("${batch.chunk.portfolio-snapshot-size:500}")
-  private int portfolioChunkSize;
+  @Value("${batch.chunk.user-profit-snapshot-size:500}")
+  private int userValuationChunkSize;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void saveDailySnapshot(LocalDate snapshotDate) {
@@ -47,103 +43,58 @@ public class UserProfitSnapshotService {
       return;
     }
 
-    Long lastPortfolioId = null;
+    String lastUserId = null;
     while (true) {
-      List<Long> portfolioIds = portfolioGroupRepository.findPortfolioIdsAfter(lastPortfolioId, portfolioChunkSize);
-      if (portfolioIds.isEmpty()) {
+      List<UserValuation> valuations = userValuationRepository.findAfter(lastUserId, userValuationChunkSize);
+      if (valuations.isEmpty()) {
         return;
       }
 
-      List<PortfolioGroup> portfolios = portfolioGroupRepository.findAllWithAssetsByIds(portfolioIds);
-      processPortfolioChunk(portfolios, snapshotDate);
+      processValuationChunk(valuations, snapshotDate);
 
-      lastPortfolioId = portfolioIds.get(portfolioIds.size() - 1);
+      lastUserId = valuations.get(valuations.size() - 1).getUserId();
       userProfitSnapshotRepository.flushAndClear();
     }
   }
 
-  private void processPortfolioChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
-    Map<UUID, List<PortfolioGroup>> portfoliosByUser = portfolios.stream()
-      .filter(portfolio -> portfolio.getUserId() != null)
-      .collect(Collectors.groupingBy(PortfolioGroup::getUserId));
-    Map<UUID, Long> internalUserIdsByExternalUserId = portfoliosByUser.keySet().stream()
-      .map(externalUserId -> Map.entry(externalUserId, userIdResolver.resolveInternalUserIdIfPresent(externalUserId)))
-      .filter(entry -> entry.getValue().isPresent())
-      .collect(Collectors.toMap(
-        Map.Entry::getKey,
-        entry -> entry.getValue().get()
-      ));
-    int skippedUserCount = portfoliosByUser.size() - internalUserIdsByExternalUserId.size();
-    if (skippedUserCount > 0) {
-      log.warn("Skip user profit snapshots for unresolved users. skippedUserCount={}, snapshotDate={}", skippedUserCount, snapshotDate);
-    }
+  private void processValuationChunk(List<UserValuation> valuations, LocalDate snapshotDate) {
+    List<Long> internalUserIds = valuations.stream()
+      .map(UserValuation::getUserId)
+      .map(this::resolveInternalUserId)
+      .flatMap(java.util.Optional::stream)
+      .toList();
+
     Set<Long> usersWithPositiveProfitHistory = userProfitSnapshotRepository.findUserIdsWithPositiveProfitSnapshot(
-      internalUserIdsByExternalUserId.values(),
+      internalUserIds,
       BigDecimal.ZERO,
       snapshotDate
     );
 
     List<UserProfitSnapshotDaily> snapshots = new ArrayList<>();
-    for (Map.Entry<UUID, List<PortfolioGroup>> entry : portfoliosByUser.entrySet()) {
-      Long internalUserId = internalUserIdsByExternalUserId.get(entry.getKey());
-      if (internalUserId == null) {
+    for (UserValuation valuation : valuations) {
+      Long internalUserId = resolveInternalUserId(valuation.getUserId()).orElse(null);
+      if (internalUserId == null || valuation.getPortfolioCount() == null || valuation.getPortfolioCount() <= 0) {
         continue;
       }
-      UserProfitSummary summary = calculateUserProfitSummary(entry.getValue());
-      if (summary.hasAssets()) {
-        UserProfitSnapshotDailyId id = new UserProfitSnapshotDailyId(internalUserId, snapshotDate);
-        publishFirstProfitBadgeIfEligible(entry.getKey(), internalUserId, summary.totalProfitLoss(), usersWithPositiveProfitHistory);
-        snapshots.add(UserProfitSnapshotDaily.create(
-          id,
-          summary.totalCurrentValue(),
-          summary.totalProfitLoss(),
-          summary.totalReturnRate()
-        ));
-      }
+
+      BigDecimal totalCurrentValue = BigDecimal.valueOf(valuation.getCurrentValue());
+      BigDecimal totalProfitLoss = totalCurrentValue.subtract(BigDecimal.valueOf(valuation.getPurchasedValue()));
+      BigDecimal totalReturnRate = BigDecimal.valueOf(valuation.getProfitRate());
+      UserProfitSnapshotDailyId id = new UserProfitSnapshotDailyId(internalUserId, snapshotDate);
+      publishFirstProfitBadgeIfEligible(valuation.getUserId(), internalUserId, totalProfitLoss, usersWithPositiveProfitHistory);
+      snapshots.add(UserProfitSnapshotDaily.create(
+        id,
+        totalCurrentValue,
+        totalProfitLoss,
+        totalReturnRate
+      ));
     }
 
     userProfitSnapshotRepository.saveAll(snapshots);
   }
 
-  private UserProfitSummary calculateUserProfitSummary(List<PortfolioGroup> portfolios) {
-    boolean hasAssets = portfolios.stream()
-      .flatMap(portfolio -> portfolio.getAssets().stream())
-      .findAny()
-      .isPresent();
-
-    if (!hasAssets) {
-      return new UserProfitSummary(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false);
-    }
-
-    BigDecimal totalCurrentValue = portfolios.stream()
-      .map(PortfolioGroup::getValuation)
-      .filter(Objects::nonNull)
-      .map(valuation -> Objects.requireNonNullElse(valuation.getTotalCurrentValue(), BigDecimal.ZERO))
-      .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-    BigDecimal totalProfitLoss = portfolios.stream()
-      .map(PortfolioGroup::getValuation)
-      .filter(Objects::nonNull)
-      .map(valuation -> Objects.requireNonNullElse(valuation.getTotalProfitLoss(), BigDecimal.ZERO))
-      .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-    BigDecimal purchaseAmount = totalCurrentValue.subtract(totalProfitLoss);
-    BigDecimal totalReturnRate = calculateReturnRate(totalProfitLoss, purchaseAmount);
-
-    return new UserProfitSummary(totalCurrentValue, totalProfitLoss, totalReturnRate, true);
-  }
-
-  private BigDecimal calculateReturnRate(BigDecimal profitLoss, BigDecimal purchaseAmount) {
-    if (purchaseAmount.compareTo(BigDecimal.ZERO) == 0) {
-      return BigDecimal.ZERO;
-    }
-    return profitLoss
-      .divide(purchaseAmount, 4, RoundingMode.HALF_UP)
-      .multiply(BigDecimal.valueOf(100));
-  }
-
   private void publishFirstProfitBadgeIfEligible(
-    UUID userId,
+    String userId,
     Long internalUserId,
     BigDecimal totalProfitLoss,
     Set<Long> usersWithPositiveProfitHistory
@@ -159,18 +110,27 @@ public class UserProfitSnapshotService {
     }
 
     gamificationEventProducer.publishRewardBadgeEvent(RewardBadgeEvent.builder()
-      .userId(userId.toString())
+      .userId(userId)
       .badgeCode(Badge.FIRST_PROFIT.name())
       .issuedAt(Instant.now())
       .reason("첫 수익 달성")
       .build());
   }
 
-  private record UserProfitSummary(
-    BigDecimal totalCurrentValue,
-    BigDecimal totalProfitLoss,
-    BigDecimal totalReturnRate,
-    boolean hasAssets
-  ) {
+  private java.util.Optional<Long> resolveInternalUserId(String userId) {
+    if (userId == null || userId.isBlank()) {
+      return java.util.Optional.empty();
+    }
+
+    try {
+      return userIdResolver.resolveInternalUserIdIfPresent(UUID.fromString(userId));
+    } catch (IllegalArgumentException ignored) {
+      try {
+        return java.util.Optional.of(Long.valueOf(userId));
+      } catch (NumberFormatException ex) {
+        log.warn("Skip user profit snapshot for unsupported userId format. userId={}", userId);
+        return java.util.Optional.empty();
+      }
+    }
   }
 }

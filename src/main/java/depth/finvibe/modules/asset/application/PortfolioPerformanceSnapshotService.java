@@ -3,7 +3,10 @@ package depth.finvibe.modules.asset.application;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,10 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
 import depth.finvibe.modules.asset.application.port.out.PortfolioPerformanceSnapshotRepository;
+import depth.finvibe.modules.asset.application.port.out.PortfolioValuationRepository;
 import depth.finvibe.modules.asset.domain.PortfolioGroup;
 import depth.finvibe.modules.asset.domain.PortfolioPerformanceSnapshotDaily;
 import depth.finvibe.modules.asset.domain.PortfolioPerformanceSnapshotDailyId;
-import depth.finvibe.modules.asset.domain.PortfolioValuation;
+import depth.finvibe.modules.asset.domain.PortfolioValuationReadModel;
 import depth.finvibe.modules.user.application.service.UserIdResolver;
 
 @Service
@@ -26,6 +30,7 @@ import depth.finvibe.modules.user.application.service.UserIdResolver;
 public class PortfolioPerformanceSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final PortfolioPerformanceSnapshotRepository portfolioPerformanceSnapshotRepository;
+  private final PortfolioValuationRepository portfolioValuationRepository;
   private final UserIdResolver userIdResolver;
 
   @Value("${batch.chunk.portfolio-snapshot-size:500}")
@@ -39,30 +44,42 @@ public class PortfolioPerformanceSnapshotService {
 
     Long lastPortfolioId = null;
     while (true) {
-      List<Long> portfolioIds = portfolioGroupRepository.findPortfolioIdsAfter(lastPortfolioId, portfolioChunkSize);
+      List<Long> portfolioIds = portfolioValuationRepository.findActivePortfolioIdsAfter(lastPortfolioId, portfolioChunkSize);
       if (portfolioIds.isEmpty()) {
         return;
       }
 
-      List<PortfolioGroup> portfolios = portfolioGroupRepository.findAllWithAssetsByIds(portfolioIds);
-      saveSnapshotChunk(portfolios, snapshotDate);
+      saveSnapshotChunk(portfolioIds, snapshotDate);
 
       lastPortfolioId = portfolioIds.get(portfolioIds.size() - 1);
       portfolioPerformanceSnapshotRepository.flushAndClear();
     }
   }
 
-  private void saveSnapshotChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
+  private void saveSnapshotChunk(List<Long> portfolioIds, LocalDate snapshotDate) {
+    Map<Long, PortfolioValuationReadModel> valuationsByPortfolioId = portfolioValuationRepository.findActiveByPortfolioIds(portfolioIds)
+      .stream()
+      .collect(Collectors.toMap(PortfolioValuationReadModel::getPortfolioId, Function.identity()));
+    List<PortfolioGroup> portfolios = portfolioGroupRepository.findAllWithAssetsByIds(portfolioIds);
+
     List<PortfolioPerformanceSnapshotDaily> snapshots = portfolios.stream()
       .filter(portfolio -> portfolio.getId() != null)
-      .map(portfolio -> toSnapshotIfResolvable(portfolio, snapshotDate))
+      .map(portfolio -> toSnapshotIfResolvable(portfolio, valuationsByPortfolioId.get(portfolio.getId()), snapshotDate))
       .flatMap(Optional::stream)
       .toList();
 
     portfolioPerformanceSnapshotRepository.saveAll(snapshots);
   }
 
-  private Optional<PortfolioPerformanceSnapshotDaily> toSnapshotIfResolvable(PortfolioGroup portfolio, LocalDate snapshotDate) {
+  private Optional<PortfolioPerformanceSnapshotDaily> toSnapshotIfResolvable(
+    PortfolioGroup portfolio,
+    PortfolioValuationReadModel valuation,
+    LocalDate snapshotDate
+  ) {
+    if (valuation == null) {
+      return Optional.empty();
+    }
+
     Optional<Long> internalUserId = userIdResolver.resolveInternalUserIdIfPresent(portfolio.getUserId());
     if (internalUserId.isEmpty()) {
       log.warn("Skip portfolio performance snapshot for unresolved user. portfolioId={}, userId={}, snapshotDate={}",
@@ -70,16 +87,9 @@ public class PortfolioPerformanceSnapshotService {
       return Optional.empty();
     }
 
-    PortfolioValuation valuation = portfolio.getValuation();
-    BigDecimal totalCurrentValue = BigDecimal.ZERO;
-    BigDecimal totalProfitLoss = BigDecimal.ZERO;
-    BigDecimal totalReturnRate = BigDecimal.ZERO;
-
-    if (valuation != null) {
-      totalCurrentValue = valuation.getTotalCurrentValue() != null ? valuation.getTotalCurrentValue() : BigDecimal.ZERO;
-      totalProfitLoss = valuation.getTotalProfitLoss() != null ? valuation.getTotalProfitLoss() : BigDecimal.ZERO;
-      totalReturnRate = valuation.getTotalReturnRate() != null ? valuation.getTotalReturnRate() : BigDecimal.ZERO;
-    }
+    BigDecimal totalCurrentValue = BigDecimal.valueOf(valuation.getCurrentValue());
+    BigDecimal totalProfitLoss = totalCurrentValue.subtract(BigDecimal.valueOf(valuation.getPurchasedValue()));
+    BigDecimal totalReturnRate = BigDecimal.valueOf(valuation.getProfitRate());
 
     return Optional.of(PortfolioPerformanceSnapshotDaily.create(
       new PortfolioPerformanceSnapshotDailyId(portfolio.getId(), snapshotDate),

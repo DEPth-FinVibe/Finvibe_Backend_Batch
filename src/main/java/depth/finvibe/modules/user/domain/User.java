@@ -5,6 +5,8 @@ import java.util.UUID;
 import depth.finvibe.modules.user.domain.vo.*;
 import jakarta.persistence.*;
 import lombok.Builder;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import depth.finvibe.modules.user.domain.enums.UserRole;
@@ -28,6 +30,17 @@ public class User extends TimeStampedBaseEntity {
     @Id
     @Builder.Default
     private UUID id = UUID.randomUUID();
+
+    @Generated(event = EventType.INSERT)
+    @Column(
+        name = "internal_user_id",
+        nullable = false,
+        unique = true,
+        insertable = false,
+        updatable = false,
+        columnDefinition = "BIGINT AUTO_INCREMENT"
+    )
+    private Long internalUserId;
 
     @Embedded
     @AttributeOverride(name = "value", column = @Column(name = "login_id"))

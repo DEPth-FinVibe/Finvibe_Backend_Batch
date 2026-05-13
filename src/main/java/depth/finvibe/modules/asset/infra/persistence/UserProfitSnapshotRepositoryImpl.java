@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,7 @@ public class UserProfitSnapshotRepositoryImpl implements UserProfitSnapshotRepos
     jpaRepository.saveAll(snapshots);
   }
 
-  public boolean existsPositiveProfitSnapshot(UUID userId, BigDecimal minimumProfit, LocalDate beforeDate) {
+  public boolean existsPositiveProfitSnapshot(Long userId, BigDecimal minimumProfit, LocalDate beforeDate) {
     if (userId == null || minimumProfit == null || beforeDate == null) {
       return false;
     }
@@ -40,8 +39,8 @@ public class UserProfitSnapshotRepositoryImpl implements UserProfitSnapshotRepos
   }
 
   @Override
-  public Set<UUID> findUserIdsWithPositiveProfitSnapshot(
-    Collection<UUID> userIds,
+  public Set<Long> findUserIdsWithPositiveProfitSnapshot(
+    Collection<Long> userIds,
     BigDecimal minimumProfit,
     LocalDate beforeDate
   ) {

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,7 +15,7 @@ import depth.finvibe.modules.asset.domain.UserProfitSnapshotDailyId;
 public interface UserProfitSnapshotDailyJpaRepository
   extends JpaRepository<UserProfitSnapshotDaily, UserProfitSnapshotDailyId> {
   boolean existsByIdUserIdAndTotalProfitLossGreaterThanAndIdSnapshotDateLessThan(
-    UUID userId,
+    Long userId,
     BigDecimal minimumProfit,
     LocalDate snapshotDate
   );
@@ -28,8 +27,8 @@ public interface UserProfitSnapshotDailyJpaRepository
       and snapshot.totalProfitLoss > :minimumProfit
       and snapshot.id.snapshotDate < :snapshotDate
     """)
-  List<UUID> findPositiveProfitUserIdsBeforeDate(
-    @Param("userIds") Collection<UUID> userIds,
+  List<Long> findPositiveProfitUserIdsBeforeDate(
+    @Param("userIds") Collection<Long> userIds,
     @Param("minimumProfit") BigDecimal minimumProfit,
     @Param("snapshotDate") LocalDate snapshotDate
   );

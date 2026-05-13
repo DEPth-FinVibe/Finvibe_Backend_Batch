@@ -2,7 +2,6 @@ package depth.finvibe.modules.asset.domain;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
@@ -31,8 +30,8 @@ public class PortfolioPerformanceSnapshotDaily {
     @EmbeddedId
     private PortfolioPerformanceSnapshotDailyId id;
 
-    @Column(name = "user_id", nullable = false, columnDefinition = "BINARY(16)")
-    private UUID userId;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @Column(name = "portfolio_name", nullable = false, length = 100)
     private String portfolioName;
@@ -51,7 +50,7 @@ public class PortfolioPerformanceSnapshotDaily {
 
     public static PortfolioPerformanceSnapshotDaily create(
             PortfolioPerformanceSnapshotDailyId id,
-            UUID userId,
+            Long userId,
             String portfolioName,
             BigDecimal totalCurrentValue,
             BigDecimal totalProfitLoss,

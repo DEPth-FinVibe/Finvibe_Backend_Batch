@@ -16,12 +16,14 @@ import depth.finvibe.modules.asset.domain.PortfolioGroup;
 import depth.finvibe.modules.asset.domain.PortfolioPerformanceSnapshotDaily;
 import depth.finvibe.modules.asset.domain.PortfolioPerformanceSnapshotDailyId;
 import depth.finvibe.modules.asset.domain.PortfolioValuation;
+import depth.finvibe.modules.user.application.service.UserIdResolver;
 
 @Service
 @RequiredArgsConstructor
 public class PortfolioPerformanceSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final PortfolioPerformanceSnapshotRepository portfolioPerformanceSnapshotRepository;
+  private final UserIdResolver userIdResolver;
 
   @Value("${batch.chunk.portfolio-snapshot-size:500}")
   private int portfolioChunkSize;
@@ -70,7 +72,7 @@ public class PortfolioPerformanceSnapshotService {
 
     return PortfolioPerformanceSnapshotDaily.create(
       new PortfolioPerformanceSnapshotDailyId(portfolio.getId(), snapshotDate),
-      portfolio.getUserId(),
+      userIdResolver.resolveInternalUserId(portfolio.getUserId()),
       portfolio.getName(),
       totalCurrentValue,
       totalProfitLoss,

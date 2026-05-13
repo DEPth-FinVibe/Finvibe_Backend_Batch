@@ -26,6 +26,7 @@ import depth.finvibe.modules.asset.domain.UserProfitSnapshotDailyId;
 import depth.finvibe.common.investment.application.port.out.GamificationEventProducer;
 import depth.finvibe.common.investment.dto.Badge;
 import depth.finvibe.common.investment.dto.RewardBadgeEvent;
+import depth.finvibe.modules.user.application.service.UserIdResolver;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class UserProfitSnapshotService {
   private final PortfolioGroupRepository portfolioGroupRepository;
   private final UserProfitSnapshotRepository userProfitSnapshotRepository;
   private final GamificationEventProducer gamificationEventProducer;
+  private final UserIdResolver userIdResolver;
 
   @Value("${batch.chunk.portfolio-snapshot-size:500}")
   private int portfolioChunkSize;
@@ -61,8 +63,13 @@ public class UserProfitSnapshotService {
   private void processPortfolioChunk(List<PortfolioGroup> portfolios, LocalDate snapshotDate) {
     Map<UUID, List<PortfolioGroup>> portfoliosByUser = portfolios.stream()
       .collect(Collectors.groupingBy(PortfolioGroup::getUserId));
-    Set<UUID> usersWithPositiveProfitHistory = userProfitSnapshotRepository.findUserIdsWithPositiveProfitSnapshot(
-      portfoliosByUser.keySet(),
+    Map<UUID, Long> internalUserIdsByExternalUserId = portfoliosByUser.keySet().stream()
+      .collect(Collectors.toMap(
+        externalUserId -> externalUserId,
+        userIdResolver::resolveInternalUserId
+      ));
+    Set<Long> usersWithPositiveProfitHistory = userProfitSnapshotRepository.findUserIdsWithPositiveProfitSnapshot(
+      internalUserIdsByExternalUserId.values(),
       BigDecimal.ZERO,
       snapshotDate
     );
@@ -71,8 +78,9 @@ public class UserProfitSnapshotService {
     for (Map.Entry<UUID, List<PortfolioGroup>> entry : portfoliosByUser.entrySet()) {
       UserProfitSummary summary = calculateUserProfitSummary(entry.getValue());
       if (summary.hasAssets()) {
-        UserProfitSnapshotDailyId id = new UserProfitSnapshotDailyId(entry.getKey(), snapshotDate);
-        publishFirstProfitBadgeIfEligible(entry.getKey(), summary.totalProfitLoss(), usersWithPositiveProfitHistory);
+        Long internalUserId = internalUserIdsByExternalUserId.get(entry.getKey());
+        UserProfitSnapshotDailyId id = new UserProfitSnapshotDailyId(internalUserId, snapshotDate);
+        publishFirstProfitBadgeIfEligible(entry.getKey(), internalUserId, summary.totalProfitLoss(), usersWithPositiveProfitHistory);
         snapshots.add(UserProfitSnapshotDaily.create(
           id,
           summary.totalCurrentValue(),
@@ -124,16 +132,17 @@ public class UserProfitSnapshotService {
 
   private void publishFirstProfitBadgeIfEligible(
     UUID userId,
+    Long internalUserId,
     BigDecimal totalProfitLoss,
-    Set<UUID> usersWithPositiveProfitHistory
+    Set<Long> usersWithPositiveProfitHistory
   ) {
-    if (userId == null || totalProfitLoss == null || usersWithPositiveProfitHistory == null) {
+    if (userId == null || internalUserId == null || totalProfitLoss == null || usersWithPositiveProfitHistory == null) {
       return;
     }
     if (totalProfitLoss.compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
-    if (usersWithPositiveProfitHistory.contains(userId)) {
+    if (usersWithPositiveProfitHistory.contains(internalUserId)) {
       return;
     }
 

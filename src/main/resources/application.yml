@@ -3,7 +3,6 @@ spring:
     name: finvibe-backend-batch
   main:
     allow-bean-definition-overriding: true
-    web-application-type: none
   config:
     import: optional:file:.env[.properties]
   profiles:

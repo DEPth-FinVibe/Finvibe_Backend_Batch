@@ -28,6 +28,11 @@ public class UserRepositoryImpl implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByInternalUserId(Long internalUserId) {
+        return jpaUserRepository.findByInternalUserId(internalUserId);
+    }
+
+    @Override
     public Optional<User> findByLoginId(LoginId loginId) {
         return jpaUserRepository.findByLoginId(loginId);
     }

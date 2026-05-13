@@ -13,6 +13,8 @@ public interface UserRepository {
 
     Optional<User> findById(UUID id);
 
+    Optional<User> findByInternalUserId(Long internalUserId);
+
     Optional<User> findByLoginId(LoginId loginId);
 
     Optional<User> findByOauthInfo(OAuthInfo oauthInfo);

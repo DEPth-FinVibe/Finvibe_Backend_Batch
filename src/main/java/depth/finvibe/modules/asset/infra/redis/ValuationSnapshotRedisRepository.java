@@ -26,26 +26,19 @@ public class ValuationSnapshotRedisRepository implements ValuationSnapshotReposi
             return Optional.empty();
         }
 
-        List<String> values = redisTemplate.opsForValue().multiGet(List.of(
-            portfolioKey(portfolioId, "purchased-value"),
-            portfolioKey(portfolioId, "current-value"),
-            portfolioKey(portfolioId, "profit-rate"),
-            portfolioKey(portfolioId, "asset-count"),
-            portfolioKey(portfolioId, "updated-at")
-        ));
-        if (values == null || values.size() < 5 || hasMissingRequired(values, 4)) {
-            log.warn("Missing portfolio valuation snapshot. portfolioId={}", portfolioId);
-            return Optional.empty();
+        List<String> hashValues = hashMultiGet(portfolioHashKey(portfolioId), List.of("pv", "cv", "pr", "ac", "ua"));
+        if (hashValues != null && hashValues.size() >= 5 && !hasMissingRequired(hashValues, 4)) {
+            return Optional.of(new PortfolioValuationSnapshot(
+                portfolioId,
+                parseLong(hashValues.get(0), portfolioId, "pv"),
+                parseLong(hashValues.get(1), portfolioId, "cv"),
+                parseDouble(hashValues.get(2), portfolioId, "pr"),
+                parseLong(hashValues.get(3), portfolioId, "ac"),
+                parseInstant(hashValues.get(4), portfolioId, "ua").orElse(null)
+            ));
         }
-
-        return Optional.of(new PortfolioValuationSnapshot(
-            portfolioId,
-            parseLong(values.get(0), portfolioId, "purchased-value"),
-            parseLong(values.get(1), portfolioId, "current-value"),
-            parseDouble(values.get(2), portfolioId, "profit-rate"),
-            parseLong(values.get(3), portfolioId, "asset-count"),
-            parseInstant(values.get(4), portfolioId, "updated-at").orElse(null)
-        ));
+        log.warn("Missing portfolio valuation snapshot. portfolioId={}", portfolioId);
+        return Optional.empty();
     }
 
     @Override
@@ -54,38 +47,49 @@ public class ValuationSnapshotRedisRepository implements ValuationSnapshotReposi
             return Optional.empty();
         }
 
-        List<String> values = redisTemplate.opsForValue().multiGet(List.of(
-            userKey(userId, "purchased-value"),
-            userKey(userId, "current-value"),
-            userKey(userId, "profit-rate"),
-            userKey(userId, "portfolio-count"),
-            userKey(userId, "updated-at")
-        ));
-        if (values == null || values.size() < 5 || hasMissingRequired(values, 4)) {
-            log.warn("Missing user valuation snapshot. userId={}", userId);
-            return Optional.empty();
+        List<String> hashValues = hashMultiGet(userHashKey(userId), List.of("pv", "cv", "pr", "pc", "ua"));
+        if (hashValues != null && hashValues.size() >= 5 && !hasMissingRequired(hashValues, 4)) {
+            return Optional.of(new UserValuationSnapshot(
+                userId,
+                parseLong(hashValues.get(0), userId, "pv"),
+                parseLong(hashValues.get(1), userId, "cv"),
+                parseDouble(hashValues.get(2), userId, "pr"),
+                parseLong(hashValues.get(3), userId, "pc"),
+                parseInstant(hashValues.get(4), userId, "ua").orElse(null)
+            ));
         }
-
-        return Optional.of(new UserValuationSnapshot(
-            userId,
-            parseLong(values.get(0), userId, "purchased-value"),
-            parseLong(values.get(1), userId, "current-value"),
-            parseDouble(values.get(2), userId, "profit-rate"),
-            parseLong(values.get(3), userId, "portfolio-count"),
-            parseInstant(values.get(4), userId, "updated-at").orElse(null)
-        ));
+        log.warn("Missing user valuation snapshot. userId={}", userId);
+        return Optional.empty();
     }
 
     @Override
     public boolean isPortfolioDeleted(Long portfolioId) {
-        String value = redisTemplate.opsForValue().get(portfolioKey(portfolioId, "deleted"));
-        return Boolean.parseBoolean(value);
+        Object hashValue = redisTemplate.opsForHash().get(portfolioHashKey(portfolioId), "del");
+        if (hashValue != null) {
+            return parseBoolean(hashValue.toString());
+        }
+        return false;
     }
 
     @Override
     public Optional<Instant> readPortfolioDeletedAt(Long portfolioId) {
-        String value = redisTemplate.opsForValue().get(portfolioKey(portfolioId, "deleted-at"));
-        return parseInstant(value, portfolioId, "deleted-at");
+        Object hashValue = redisTemplate.opsForHash().get(portfolioHashKey(portfolioId), "da");
+        if (hashValue != null) {
+            return parseInstant(hashValue.toString(), portfolioId, "da");
+        }
+        return Optional.empty();
+    }
+
+    private List<String> hashMultiGet(String key, List<String> fields) {
+        List<Object> values = redisTemplate.opsForHash().multiGet(key, fields.stream()
+            .map(field -> (Object) field)
+            .toList());
+        if (values == null) {
+            return null;
+        }
+        return values.stream()
+            .map(value -> value == null ? null : value.toString())
+            .toList();
     }
 
     private boolean hasMissingRequired(List<String> values, int requiredCount) {
@@ -97,12 +101,12 @@ public class ValuationSnapshotRedisRepository implements ValuationSnapshotReposi
         return false;
     }
 
-    private String portfolioKey(Long portfolioId, String field) {
-        return "portfolio:" + portfolioId + ":" + field;
+    private String portfolioHashKey(Long portfolioId) {
+        return "pf:" + portfolioId;
     }
 
-    private String userKey(String userId, String field) {
-        return "user:" + userId + ":" + field;
+    private String userHashKey(String userId) {
+        return "usr:" + userId;
     }
 
     private Long parseLong(String value, Object id, String field) {
@@ -131,5 +135,9 @@ public class ValuationSnapshotRedisRepository implements ValuationSnapshotReposi
         } catch (DateTimeParseException ex) {
             throw new IllegalStateException("Invalid valuation instant field. id=" + id + ", field=" + field, ex);
         }
+    }
+
+    private boolean parseBoolean(String value) {
+        return "1".equals(value) || Boolean.parseBoolean(value);
     }
 }

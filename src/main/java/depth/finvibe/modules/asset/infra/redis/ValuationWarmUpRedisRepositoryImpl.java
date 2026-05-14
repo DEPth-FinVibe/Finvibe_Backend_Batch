@@ -58,13 +58,13 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         connection.keyCommands().del(bytes(legacyPortfolioAssetsKey(state.portfolioId())));
         connection.keyCommands().del(bytes(portfolioStocksKey(state.portfolioId())));
         set(connection, legacyPortfolioOwnerKey(state.portfolioId()), state.userId());
-        set(connection, portfolioKey(state.portfolioId(), "user"), state.userId());
-        set(connection, portfolioKey(state.portfolioId(), "purchased-value"), state.purchasedValue());
-        set(connection, portfolioKey(state.portfolioId(), "current-value"), state.currentValue());
-        set(connection, portfolioKey(state.portfolioId(), "profit-rate"), state.profitRate());
-        set(connection, portfolioKey(state.portfolioId(), "asset-count"), state.assetCount());
-        set(connection, portfolioKey(state.portfolioId(), "deleted"), false);
-        set(connection, portfolioKey(state.portfolioId(), "updated-at"), state.updatedAt().toString());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "u", state.userId());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "pv", state.purchasedValue());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "cv", state.currentValue());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "pr", state.profitRate());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "ac", state.assetCount());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "del", "0");
+        hSet(connection, portfolioHashKey(state.portfolioId()), "ua", state.updatedAt().toString());
 
         for (PortfolioWarmUpState.Holding holding : state.holdings()) {
             byte[] stockId = bytes(holding.stockId());
@@ -87,15 +87,19 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         for (Long portfolioId : state.portfolioIds()) {
             connection.setCommands().sAdd(bytes(userPortfoliosKey(state.userId())), bytes(portfolioId));
         }
-        set(connection, userKey(state.userId(), "purchased-value"), state.purchasedValue());
-        set(connection, userKey(state.userId(), "current-value"), state.currentValue());
-        set(connection, userKey(state.userId(), "profit-rate"), state.profitRate());
-        set(connection, userKey(state.userId(), "portfolio-count"), state.portfolioCount());
-        set(connection, userKey(state.userId(), "updated-at"), state.updatedAt().toString());
+        hSet(connection, userHashKey(state.userId()), "pv", state.purchasedValue());
+        hSet(connection, userHashKey(state.userId()), "cv", state.currentValue());
+        hSet(connection, userHashKey(state.userId()), "pr", state.profitRate());
+        hSet(connection, userHashKey(state.userId()), "pc", state.portfolioCount());
+        hSet(connection, userHashKey(state.userId()), "ua", state.updatedAt().toString());
     }
 
     private void set(RedisConnection connection, String key, Object value) {
         connection.stringCommands().set(bytes(key), bytes(String.valueOf(value)));
+    }
+
+    private void hSet(RedisConnection connection, String key, String field, Object value) {
+        connection.hashCommands().hSet(bytes(key), bytes(field), bytes(value));
     }
 
     private String legacyStockHoldingKey(Long stockId) {
@@ -122,12 +126,12 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         return "portfolio:" + portfolioId + ":stock:" + stockId + ":" + field;
     }
 
-    private String portfolioKey(Long portfolioId, String field) {
-        return "portfolio:" + portfolioId + ":" + field;
+    private String portfolioHashKey(Long portfolioId) {
+        return "pf:" + portfolioId;
     }
 
-    private String userKey(String userId, String field) {
-        return "user:" + userId + ":" + field;
+    private String userHashKey(String userId) {
+        return "usr:" + userId;
     }
 
     private String userPortfoliosKey(String userId) {

@@ -19,8 +19,8 @@ import depth.finvibe.modules.asset.domain.PortfolioGroup;
 import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository.AssetSnapshot;
-import depth.finvibe.modules.asset.infra.redis.PortfolioOwnerRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.StockHoldingIndexRedisRepository;
+import depth.finvibe.modules.asset.infra.redis.PortfolioStateRedisRepository;
 
 /**
  * DB ↔ Redis 인덱스 정합성 검증 및 보정 배치.
@@ -36,7 +36,7 @@ public class RedisIndexReconciliationScheduler {
 	private final PortfolioGroupQueryRepository portfolioGroupQueryRepository;
 	private final StockHoldingIndexRedisRepository stockHoldingIndexRedisRepository;
 	private final PortfolioAssetSnapshotRedisRepository portfolioAssetSnapshotRedisRepository;
-	private final PortfolioOwnerRedisRepository portfolioOwnerRedisRepository;
+	private final PortfolioStateRedisRepository portfolioStateRedisRepository;
 	private final MeterRegistry meterRegistry;
 
 	@Scheduled(fixedRate = 600_000) // 10분
@@ -110,10 +110,10 @@ public class RedisIndexReconciliationScheduler {
 			return fixes;
 		}
 
-		// 1. portfolio:owner 검증
-		java.util.UUID redisOwner = portfolioOwnerRedisRepository.get(portfolioId);
+		// 1. pf:{portfolioId}.u owner 검증
+		java.util.UUID redisOwner = portfolioStateRedisRepository.getOwner(portfolioId);
 		if (!portfolioOwner.equals(redisOwner)) {
-			portfolioOwnerRedisRepository.set(portfolioId, portfolioOwner);
+			portfolioStateRedisRepository.setOwner(portfolioId, portfolioOwner);
 			fixes++;
 		}
 

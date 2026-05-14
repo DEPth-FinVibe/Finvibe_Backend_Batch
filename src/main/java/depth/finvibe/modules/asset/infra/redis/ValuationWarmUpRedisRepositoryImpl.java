@@ -19,7 +19,6 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
     private static final String LEGACY_STOCK_HOLDING_PREFIX = "stock:holding:";
     private static final String LEGACY_STOCK_HOLDING_SUFFIX = ":portfolios";
     private static final String LEGACY_PORTFOLIO_ASSETS_PREFIX = "portfolio:assets:";
-    private static final String LEGACY_PORTFOLIO_OWNER_PREFIX = "portfolio:owner:";
 
     private final StringRedisTemplate redisTemplate;
 
@@ -57,7 +56,6 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
 
         connection.keyCommands().del(bytes(legacyPortfolioAssetsKey(state.portfolioId())));
         connection.keyCommands().del(bytes(portfolioStocksKey(state.portfolioId())));
-        set(connection, legacyPortfolioOwnerKey(state.portfolioId()), state.userId());
         hSet(connection, portfolioHashKey(state.portfolioId()), "u", state.userId());
         hSet(connection, portfolioHashKey(state.portfolioId()), "pv", state.purchasedValue());
         hSet(connection, portfolioHashKey(state.portfolioId()), "cv", state.currentValue());
@@ -108,10 +106,6 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
 
     private String legacyPortfolioAssetsKey(Long portfolioId) {
         return LEGACY_PORTFOLIO_ASSETS_PREFIX + portfolioId;
-    }
-
-    private String legacyPortfolioOwnerKey(Long portfolioId) {
-        return LEGACY_PORTFOLIO_OWNER_PREFIX + portfolioId;
     }
 
     private String stockPortfoliosKey(Long stockId) {

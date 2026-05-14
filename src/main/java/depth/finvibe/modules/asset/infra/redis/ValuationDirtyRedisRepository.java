@@ -1,6 +1,7 @@
 package depth.finvibe.modules.asset.infra.redis;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,27 @@ public class ValuationDirtyRedisRepository implements ValuationDirtyRepository {
     private static final String PORTFOLIO_VALUATION_DELETION_DIRTY_KEY = "dirty:portfolio-valuation-deletions";
 
     private final StringRedisTemplate redisTemplate;
+
+    @Override
+    public void addPortfolioValuationDirty(List<Long> portfolioIds) {
+        addAllToSet(
+            PORTFOLIO_VALUATION_DIRTY_KEY,
+            portfolioIds == null ? List.of() : portfolioIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(String::valueOf)
+                .toList()
+        );
+    }
+
+    @Override
+    public void addUserValuationDirty(List<String> userIds) {
+        addAllToSet(
+            USER_VALUATION_DIRTY_KEY,
+            userIds == null ? List.of() : userIds.stream()
+                .filter(userId -> userId != null && !userId.isBlank())
+                .toList()
+        );
+    }
 
     @Override
     public List<Long> scanPortfolioValuationDirty(int limit) {
@@ -77,6 +99,13 @@ public class ValuationDirtyRedisRepository implements ValuationDirtyRepository {
             }
         }
         return values;
+    }
+
+    private void addAllToSet(String key, Collection<String> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        redisTemplate.opsForSet().add(key, values.toArray(String[]::new));
     }
 
     private List<Long> parseLong(String value) {

@@ -3,6 +3,10 @@ package depth.finvibe.modules.asset.application.port.out;
 import java.util.List;
 
 public interface ValuationDirtyRepository {
+    void addPortfolioValuationDirty(List<Long> portfolioIds);
+
+    void addUserValuationDirty(List<String> userIds);
+
     List<Long> scanPortfolioValuationDirty(int limit);
 
     List<String> scanUserValuationDirty(int limit);

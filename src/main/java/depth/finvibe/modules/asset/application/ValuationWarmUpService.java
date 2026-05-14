@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import depth.finvibe.modules.asset.application.dto.PortfolioWarmUpState;
 import depth.finvibe.modules.asset.application.dto.UserWarmUpState;
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
+import depth.finvibe.modules.asset.application.port.out.ValuationDirtyRepository;
 import depth.finvibe.modules.asset.application.port.out.ValuationWarmUpRedisRepository;
 import depth.finvibe.modules.asset.domain.Asset;
 import depth.finvibe.modules.asset.domain.PortfolioGroup;
@@ -35,6 +36,7 @@ public class ValuationWarmUpService {
 
     private final PortfolioGroupRepository portfolioGroupRepository;
     private final ValuationWarmUpRedisRepository valuationWarmUpRedisRepository;
+    private final ValuationDirtyRepository valuationDirtyRepository;
     private final EntityManager entityManager;
     private final MeterRegistry meterRegistry;
 
@@ -87,6 +89,9 @@ public class ValuationWarmUpService {
                 .toList();
 
             valuationWarmUpRedisRepository.writePortfolioStates(states);
+            valuationDirtyRepository.addPortfolioValuationDirty(states.stream()
+                .map(PortfolioWarmUpState::portfolioId)
+                .toList());
             portfolioCount += states.size();
             holdingCount += states.stream()
                 .mapToLong(state -> state.holdings().size())
@@ -113,6 +118,9 @@ public class ValuationWarmUpService {
             List<UserWarmUpState> states = toUserWarmUpStates(portfolios, updatedAt);
 
             valuationWarmUpRedisRepository.writeUserStates(states);
+            valuationDirtyRepository.addUserValuationDirty(states.stream()
+                .map(UserWarmUpState::userId)
+                .toList());
             userCount += states.size();
 
             lastUserId = userIds.get(userIds.size() - 1);

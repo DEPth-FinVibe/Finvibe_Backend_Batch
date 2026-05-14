@@ -23,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import depth.finvibe.modules.asset.application.dto.PortfolioWarmUpState;
 import depth.finvibe.modules.asset.application.dto.UserWarmUpState;
 import depth.finvibe.modules.asset.application.port.out.PortfolioGroupRepository;
+import depth.finvibe.modules.asset.application.port.out.ValuationDirtyRepository;
 import depth.finvibe.modules.asset.application.port.out.ValuationWarmUpRedisRepository;
 import depth.finvibe.modules.asset.domain.Asset;
 import depth.finvibe.modules.asset.domain.Currency;
@@ -38,6 +39,9 @@ class ValuationWarmUpServiceTest {
     private ValuationWarmUpRedisRepository valuationWarmUpRedisRepository;
 
     @Mock
+    private ValuationDirtyRepository valuationDirtyRepository;
+
+    @Mock
     private EntityManager entityManager;
 
     private ValuationWarmUpService service;
@@ -47,6 +51,7 @@ class ValuationWarmUpServiceTest {
         service = new ValuationWarmUpService(
             portfolioGroupRepository,
             valuationWarmUpRedisRepository,
+            valuationDirtyRepository,
             entityManager,
             new SimpleMeterRegistry()
         );
@@ -81,6 +86,7 @@ class ValuationWarmUpServiceTest {
 
         ArgumentCaptor<List<PortfolioWarmUpState>> portfolioStatesCaptor = ArgumentCaptor.forClass(List.class);
         verify(valuationWarmUpRedisRepository).writePortfolioStates(portfolioStatesCaptor.capture());
+        verify(valuationDirtyRepository).addPortfolioValuationDirty(List.of(1L, 2L));
         List<PortfolioWarmUpState> portfolioStates = portfolioStatesCaptor.getValue();
         assertThat(portfolioStates).hasSize(2);
         assertThat(portfolioStates.get(0).portfolioId()).isEqualTo(1L);
@@ -92,6 +98,7 @@ class ValuationWarmUpServiceTest {
 
         ArgumentCaptor<List<UserWarmUpState>> userStatesCaptor = ArgumentCaptor.forClass(List.class);
         verify(valuationWarmUpRedisRepository).writeUserStates(userStatesCaptor.capture());
+        verify(valuationDirtyRepository).addUserValuationDirty(List.of(userId.toString()));
         List<UserWarmUpState> userStates = userStatesCaptor.getValue();
         assertThat(userStates).hasSize(1);
         assertThat(userStates.getFirst().userId()).isEqualTo(userId.toString());
@@ -111,6 +118,8 @@ class ValuationWarmUpServiceTest {
         verify(portfolioGroupRepository, times(0)).findAllWithAssets();
         verify(valuationWarmUpRedisRepository, times(0)).writePortfolioStates(anyList());
         verify(valuationWarmUpRedisRepository, times(0)).writeUserStates(anyList());
+        verify(valuationDirtyRepository, times(0)).addPortfolioValuationDirty(anyList());
+        verify(valuationDirtyRepository, times(0)).addUserValuationDirty(anyList());
     }
 
     private Asset asset(Long stockId, String amount, String purchasePriceAmount) {

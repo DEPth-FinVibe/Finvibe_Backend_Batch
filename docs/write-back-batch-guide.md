@@ -1,66 +1,141 @@
-# Write-back Batch 구현 가이드
+# Valuation Write-back Batch Guide
 
-이 문서는 profit worker가 Redis에 저장한 valuation snapshot과 dirty marker를 외부 batch 서버가 DB에 반영하는 방법을 정리한다.
-기준 코드는 `RedisValuationRepositoryAdapter`, `RedisPortfolioStateStore`, `RedisUserStateStore`이다.
+이 문서는 profit worker가 Redis에 저장한 valuation snapshot과 dirty marker를 batch 서버가 DB에 반영하는 방법, 그리고 Redis 장애/초기 기동 시 필요한 warm-up 범위를 정리한다.
 
-## Batch 서버 책임
+현재 구현 기준 클래스:
 
-write-back batch 서버는 Redis를 source로 보고 DB를 최종 조회 저장소로 갱신한다.
+- `ValuationWriteBackService`
+- `ValuationWarmUpService`
+- `ValuationSnapshotRedisRepository`
+- `ValuationDirtyRedisRepository`
+- `ValuationWarmUpRedisRepositoryImpl`
+
+## 책임
 
 | 책임 | 설명 |
 | --- | --- |
+| Redis warm-up | worker가 가격 이벤트를 처리할 수 있도록 가격 비의존 Redis 상태를 미리 적재한다. |
 | Dirty 대상 조회 | Redis dirty set에서 write-back 대상 portfolio/user를 조회한다. |
 | Snapshot 읽기 | 대상 ID별 Redis valuation snapshot을 읽는다. |
-| DB upsert | 일반 dirty 대상은 DB valuation row에 upsert 한다. |
+| DB upsert | 정상 dirty 대상은 DB valuation read model에 upsert 한다. |
 | DB soft delete | 포트폴리오 삭제 dirty 대상은 DB portfolio valuation row를 soft delete 한다. |
 | Dirty 제거 | DB 반영에 성공한 대상만 Redis dirty set에서 제거한다. |
-| 재시도 보장 | 실패한 대상은 dirty set에 남겨 다음 batch에서 재처리한다. |
+| 재시도 보장 | 실패한 대상은 dirty set에 남겨 다음 batch tick에서 재처리한다. |
 
-## Redis Dirty Sets
+## Warm-up 정책
 
-batch 서버는 다음 set을 처리한다.
+Warm-up은 **현재가에 의존하지 않는 상태만** Redis에 적재한다. 현재가, 현재 평가액, 수익률은 첫 가격 이벤트가 발생한 뒤 profit worker가 계산한다.
+
+### 포함 대상
+
+| Redis key | 타입 | 설명 |
+| --- | --- | --- |
+| `stock:holding:{stockId}:portfolios` | Set<Long> | 모놀리스 호환 종목 -> 포트폴리오 인덱스 |
+| `portfolio:assets:{portfolioId}` | Hash | 모놀리스 호환 포트폴리오 보유 종목 snapshot |
+| `portfolio:owner:{portfolioId}` | String | 모놀리스 호환 포트폴리오 소유자 |
+| `stock:{stockId}:portfolios` | Set<Long> | 가이드 신규 종목 -> 포트폴리오 인덱스 |
+| `portfolio:{portfolioId}:stocks` | Set<Long> | 포트폴리오 보유 종목 목록 |
+| `portfolio:{portfolioId}:stock:{stockId}:quantity` | String | 해당 종목 보유 수량 |
+| `portfolio:{portfolioId}:user` | String | 포트폴리오 소유자 userId |
+| `user:{userId}:portfolios` | Set<Long> | 유저 활성 포트폴리오 목록 |
+| `portfolio:{portfolioId}:purchased-value` | String(Long) | 포트폴리오 총 매입금 |
+| `portfolio:{portfolioId}:asset-count` | String(Long) | 보유 수량이 0보다 큰 종목 수 |
+| `portfolio:{portfolioId}:deleted` | String(Boolean) | warm-up 대상은 `false` |
+| `portfolio:{portfolioId}:updated-at` | Instant string | warm-up 적재 시각 |
+| `user:{userId}:purchased-value` | String(Long) | 유저 전체 총 매입금 |
+| `user:{userId}:portfolio-count` | String(Long) | 유저 활성 포트폴리오 수 |
+| `user:{userId}:updated-at` | Instant string | warm-up 적재 시각 |
+
+### 제외 대상
+
+| Redis key 또는 동작 | 제외 이유 |
+| --- | --- |
+| `portfolio:{portfolioId}:stock:{stockId}:current-value` | 현재가 필요 |
+| `portfolio:{portfolioId}:current-value` | 현재가 필요 |
+| `portfolio:{portfolioId}:profit-rate` | 현재 평가액 필요 |
+| `user:{userId}:current-value` | 현재 평가액 필요 |
+| `user:{userId}:profit-rate` | 현재 평가액 필요 |
+| `dirty:portfolio-valuations` 등록 | 필수 snapshot이 완성되지 않았으므로 write-back 불가 |
+| `dirty:user-valuations` 등록 | 필수 snapshot이 완성되지 않았으므로 write-back 불가 |
+
+## Warm-up Source
+
+Warm-up source는 DB의 자산 원천 모델이다.
+
+| 목적 | 엔티티 | 필드 |
+| --- | --- | --- |
+| 활성 포트폴리오 | `PortfolioGroup` | `id`, `userId` |
+| 보유 종목 | `Asset` | `stockId`, `amount`, `totalPrice.amount`, `totalPrice.currency` |
+| 포트폴리오-유저 관계 | `PortfolioGroup` | `userId` |
+
+현재 asset 도메인에는 portfolio soft delete 컬럼이 없다. 따라서 DB에 존재하는 `PortfolioGroup`은 warm-up 기준 활성 포트폴리오로 본다.
+
+보유 종목은 `asset.amount > 0`인 경우만 포함한다.
+
+## Warm-up 대용량 처리
+
+유저 수가 수십만 이상일 수 있으므로 전체 데이터를 한 번에 로딩하지 않는다.
+
+현재 구현은 Spring Batch job `executeValuationWarmUpJob`에서 2-step으로 수행한다.
+
+| Step | 설명 |
+| --- | --- |
+| `portfolioStateWarmUpStep` | `portfolio.id > lastId` keyset chunk로 portfolio/asset 상태 적재 |
+| `userStateWarmUpStep` | `userId > lastUserId` keyset chunk로 user aggregate 상태 적재 |
+
+OOM 방지 원칙:
+
+- `findAllWithAssets()` 전체 조회 금지
+- offset paging 금지
+- keyset paging 사용
+- 기본 chunk size는 `1000`
+- Redis write는 chunk 단위 pipeline 사용
+- chunk 처리 후 `EntityManager.clear()` 호출
+- JVM에 전체 user aggregate map을 보관하지 않음
+
+설정:
+
+```yaml
+batch:
+  warm-up:
+    chunk-size: ${BATCH_WARM_UP_CHUNK_SIZE:1000}
+```
+
+수동 실행:
+
+```text
+BATCH_MANUAL_TRIGGER_ENABLED=true
+BATCH_MANUAL_TRIGGER_JOBS=valuation-warm-up
+```
+
+## Write-back Dirty Sets
 
 | Redis set | 값 타입 | 처리 |
 | --- | --- | --- |
+| `dirty:portfolio-valuation-deletions` | `Long` portfolioId | portfolio valuation soft delete |
 | `dirty:portfolio-valuations` | `Long` portfolioId | portfolio valuation upsert |
 | `dirty:user-valuations` | `String` userId | user valuation upsert |
-| `dirty:portfolio-valuation-deletions` | `Long` portfolioId | portfolio valuation soft delete |
 
 처리 원칙:
 
-- dirty set은 queue처럼 취급하되, 실패 시 유실되면 안 된다.
-- 단순 `SPOP`은 처리 중 장애가 나면 대상이 유실될 수 있다.
-- 초기 구현은 `SSCAN` 또는 `SMEMBERS`로 읽고, DB 성공 후 `SREM` 하는 방식이 안전하다.
-- 대상 수가 많아지면 `SSCAN` + batch size 제한을 사용한다.
+- dirty set은 queue처럼 취급하되 실패 시 유실되면 안 된다.
+- `SPOP`은 사용하지 않는다.
+- `SSCAN`으로 읽고 DB 성공 후 `SREM` 한다.
+- 실패하거나 필수 snapshot이 누락되면 dirty set에 남긴다.
 
-## Redis Snapshot Keys
-
-현재 worker가 쓰는 Redis key는 다음과 같다.
+## Write-back Snapshot Keys
 
 ### Portfolio Valuation
 
 | 필드 | Redis key | 타입 | 필수 |
 | --- | --- | --- | --- |
-| purchasedValue | `portfolio:{portfolioId}:purchased-value` | Long | upsert 시 필수 |
-| currentValue | `portfolio:{portfolioId}:current-value` | Long | upsert 시 필수 |
-| profitRate | `portfolio:{portfolioId}:profit-rate` | Double | upsert 시 필수 |
-| assetCount | `portfolio:{portfolioId}:asset-count` | Long | upsert 시 필수 |
-| updatedAt | `portfolio:{portfolioId}:updated-at` | Instant string | upsert 시 권장 |
-| deleted | `portfolio:{portfolioId}:deleted` | Boolean string | soft delete 시 사용 |
-| deletedAt | `portfolio:{portfolioId}:deleted-at` | Instant string | soft delete 시 필수 |
-
-DB row 기준 필드:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| portfolioId | Long | PK |
-| purchasedValue | Long | 총 구매액 |
-| currentValue | Long | 현재 총 평가액 |
-| profitRate | Double | 수익률 |
-| assetCount | Long | 보유 종목 수 |
-| updatedAt | Instant | snapshot 갱신 시각. DB schema에 추가 권장 |
-| deleted | Boolean | soft delete 여부. DB schema에 추가 필요 |
-| deletedAt | Instant | soft delete 시각. DB schema에 추가 필요 |
+| purchasedValue | `portfolio:{portfolioId}:purchased-value` | Long | 필수 |
+| currentValue | `portfolio:{portfolioId}:current-value` | Long | 필수 |
+| profitRate | `portfolio:{portfolioId}:profit-rate` | Double | 필수 |
+| assetCount | `portfolio:{portfolioId}:asset-count` | Long | 필수 |
+| updatedAt | `portfolio:{portfolioId}:updated-at` | Instant string | 권장 |
+| deleted | `portfolio:{portfolioId}:deleted` | Boolean string | 삭제 판단 |
+| deletedAt | `portfolio:{portfolioId}:deleted-at` | Instant string | 삭제 처리 필수 |
 
 ### User Valuation
 
@@ -72,245 +147,96 @@ DB row 기준 필드:
 | portfolioCount | `user:{userId}:portfolio-count` | Long | 필수 |
 | updatedAt | `user:{userId}:updated-at` | Instant string | 권장 |
 
-DB row 기준 필드:
-
-| 필드 | 타입 | 설명 |
-| --- | --- | --- |
-| userId | String | PK. 현재 worker는 String userId를 사용한다. |
-| purchasedValue | Long | 유저 전체 총 구매액 |
-| currentValue | Long | 유저 전체 현재 평가액 |
-| profitRate | Double | 수익률 |
-| portfolioCount | Long | 보유 포트폴리오 수 |
-| updatedAt | Instant | snapshot 갱신 시각. DB schema에 추가 권장 |
+Warm-up 직후에는 `current-value`, `profit-rate`가 없을 수 있다. 이 상태에서는 worker가 dirty set에 넣지 않아야 하며, write-back batch도 dirty 대상이 없으므로 DB 반영을 시도하지 않는다.
 
 ## 처리 순서
 
-한 번의 batch tick에서 다음 순서를 권장한다.
+한 번의 write-back tick에서는 다음 순서를 지킨다.
 
-1. Portfolio deletion dirty 대상을 처리한다.
-2. Portfolio valuation dirty 대상을 처리한다.
-3. User valuation dirty 대상을 처리한다.
+1. Portfolio deletion dirty 처리
+2. Portfolio valuation dirty 처리
+3. User valuation dirty 처리
 
-이유:
+삭제를 먼저 처리해야 삭제된 포트폴리오가 일반 upsert로 다시 살아나는 것을 방지할 수 있다.
 
-- 삭제된 포트폴리오가 일반 portfolio dirty set에도 남아 있을 수 있다.
-- 삭제 처리를 먼저 하면 DB에서 삭제 상태가 우선 적용된다.
-- portfolio valuation 반영 후 user valuation을 반영하면 유저 snapshot이 더 최신 portfolio 상태를 기준으로 저장될 가능성이 높다.
+## DB Read Model
 
-## Portfolio Upsert 절차
+### `portfolio_valuation`
 
-대상: `dirty:portfolio-valuations`의 portfolioId.
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `portfolio_id` | BIGINT | PK |
+| `purchased_value` | BIGINT | 총 매입금 |
+| `current_value` | BIGINT | 현재 평가액 |
+| `profit_rate` | DOUBLE | 수익률 |
+| `asset_count` | BIGINT | 보유 종목 수 |
+| `updated_at` | TIMESTAMP | 마지막 snapshot 시각 |
+| `deleted` | BOOLEAN | soft delete 여부 |
+| `deleted_at` | TIMESTAMP | soft delete 시각 |
 
-절차:
+### `user_valuation`
 
-1. portfolioId를 dirty set에서 조회한다.
-2. `portfolio:{portfolioId}:deleted`가 `true`이면 일반 upsert를 건너뛰고 삭제 처리 대상으로 본다.
-3. 필수 snapshot 필드를 읽는다.
-4. 필수 필드가 누락되었으면 dirty set에서 제거하지 않는다.
-5. DB의 기존 row와 Redis `updatedAt`을 비교한다.
-6. Redis snapshot이 더 최신이면 upsert 한다.
-7. DB upsert가 성공하면 `dirty:portfolio-valuations`에서 portfolioId를 제거한다.
-
-필수 필드 누락 처리:
-
-- Redis에 해당 portfolio snapshot이 없으면 hydration 대상 로그를 남긴다.
-- dirty set은 유지한다.
-- 반복 실패가 누적되면 dead-letter 또는 manual repair 대상으로 분리한다.
-
-## User Upsert 절차
-
-대상: `dirty:user-valuations`의 userId.
-
-절차:
-
-1. userId를 dirty set에서 조회한다.
-2. 필수 snapshot 필드를 읽는다.
-3. 필수 필드가 누락되었으면 dirty set에서 제거하지 않는다.
-4. DB의 기존 row와 Redis `updatedAt`을 비교한다.
-5. Redis snapshot이 더 최신이면 upsert 한다.
-6. DB upsert가 성공하면 `dirty:user-valuations`에서 userId를 제거한다.
-
-주의:
-
-- 현재 userId는 `String`이다.
-- 추후 정수 기반 userId로 변경되면 Redis key와 DB PK 타입 변경이 함께 필요하다.
-
-## Portfolio Soft Delete 절차
-
-대상: `dirty:portfolio-valuation-deletions`의 portfolioId.
-
-포트폴리오 삭제 이벤트를 처리하면 worker는 다음 Redis 값을 남긴다.
-
-| Redis key | 값 |
-| --- | --- |
-| `portfolio:{portfolioId}:deleted` | `true` |
-| `portfolio:{portfolioId}:deleted-at` | 삭제 marker 생성 시각 |
-| `dirty:portfolio-valuation-deletions` | portfolioId |
-
-절차:
-
-1. portfolioId를 삭제 dirty set에서 조회한다.
-2. `portfolio:{portfolioId}:deleted-at`을 읽는다.
-3. DB의 portfolio valuation row를 `deleted = true`, `deletedAt = Redis deletedAt`으로 갱신한다.
-4. DB row가 없어도 성공으로 처리할 수 있어야 한다.
-5. soft delete 성공 후 `dirty:portfolio-valuation-deletions`에서 portfolioId를 제거한다.
-6. 필요하면 `dirty:portfolio-valuations`에서도 같은 portfolioId를 제거한다.
-
-DB row가 없는 경우:
-
-- 삭제 이벤트가 먼저 도착했거나 이미 삭제 처리된 상태일 수 있다.
-- soft delete는 idempotent 해야 하므로 성공으로 처리하는 것을 권장한다.
-- 필요하면 tombstone row를 insert할 수 있지만, 현재 구조에서는 필수는 아니다.
+| 컬럼 | 타입 | 설명 |
+| --- | --- | --- |
+| `user_id` | VARCHAR | PK. worker 기준 String userId |
+| `purchased_value` | BIGINT | 총 매입금 |
+| `current_value` | BIGINT | 현재 평가액 |
+| `profit_rate` | DOUBLE | 수익률 |
+| `portfolio_count` | BIGINT | 포트폴리오 수 |
+| `updated_at` | TIMESTAMP | 마지막 snapshot 시각 |
 
 ## 최신성 정책
 
-Redis snapshot에는 `updatedAt`이 저장된다.
-삭제 marker에는 `deletedAt`이 저장된다.
-
-권장 정책:
-
 - 일반 upsert는 Redis `updatedAt`이 DB `updatedAt`보다 최신일 때만 반영한다.
-- DB row의 `updatedAt`이 없으면 Redis snapshot을 반영한다.
+- DB `updatedAt`이 없으면 Redis snapshot을 반영한다.
 - soft delete는 DB `deletedAt`이 없거나 Redis `deletedAt`이 더 최신일 때 반영한다.
-- soft delete된 row에는 일반 upsert가 다시 적용되지 않도록 `deleted` 여부를 확인한다.
-
-주의:
-
-- 현재 worker의 `updatedAt`은 worker 처리 시각이다.
-- 이벤트 원본 시각과 완전히 같지는 않다.
-- 이벤트 순서 보장이 더 중요해지면 event version 또는 source event timestamp를 snapshot에 저장하도록 worker를 확장한다.
+- soft delete된 portfolio valuation은 일반 upsert로 되살리지 않는다.
 
 ## Dirty 제거 기준
-
-dirty set 제거는 DB 반영 성공 이후에만 수행한다.
 
 | 상황 | 처리 |
 | --- | --- |
 | DB upsert 성공 | 해당 dirty set에서 대상 제거 |
-| DB soft delete 성공 | 삭제 dirty set에서 대상 제거, 필요 시 portfolio dirty set에서도 제거 |
+| DB soft delete 성공 | deletion dirty 제거, 필요 시 portfolio dirty도 제거 |
 | DB 반영 실패 | dirty set 유지 |
-| Redis 필수 필드 누락 | dirty set 유지, hydration 대상 기록 |
-| Redis deletedAt 누락 | 삭제 dirty set 유지, repair 대상 기록 |
+| Redis 필수 필드 누락 | dirty set 유지 |
+| Redis deletedAt 누락 | deletion dirty 유지 |
 
-## Batch Size와 재시도
+## 운영 설정
 
-권장 초기값:
-
-| 항목 | 권장값 |
-| --- | --- |
-| portfolio upsert batch size | 500 |
-| user upsert batch size | 500 |
-| portfolio deletion batch size | 500 |
-| schedule interval | 1초에서 10초 사이 |
-
-운영 중 조정 기준:
-
-- dirty backlog가 계속 증가하면 batch size 또는 실행 빈도를 늘린다.
-- DB 부하가 높으면 batch size를 줄인다.
-- Kafka consumer lag와 dirty backlog를 함께 본다.
-
-## Pseudocode
-
-```java
-void runWriteBackBatch() {
-    processPortfolioDeletes(500);
-    processPortfolioUpserts(500);
-    processUserUpserts(500);
-}
-
-void processPortfolioDeletes(int limit) {
-    for (Long portfolioId : scan("dirty:portfolio-valuation-deletions", limit)) {
-        Instant deletedAt = getInstant("portfolio:" + portfolioId + ":deleted-at");
-        if (deletedAt == null) {
-            recordRepairTarget(portfolioId);
-            continue;
-        }
-
-        softDeletePortfolioValuation(portfolioId, deletedAt);
-        srem("dirty:portfolio-valuation-deletions", portfolioId);
-        srem("dirty:portfolio-valuations", portfolioId);
-    }
-}
-
-void processPortfolioUpserts(int limit) {
-    for (Long portfolioId : scan("dirty:portfolio-valuations", limit)) {
-        if (isDeleted(portfolioId)) {
-            continue;
-        }
-
-        PortfolioSnapshot snapshot = readPortfolioSnapshot(portfolioId);
-        if (snapshot.hasMissingRequiredField()) {
-            recordHydrationTarget(portfolioId);
-            continue;
-        }
-
-        upsertPortfolioValuationIfNewer(snapshot);
-        srem("dirty:portfolio-valuations", portfolioId);
-    }
-}
-
-void processUserUpserts(int limit) {
-    for (String userId : scan("dirty:user-valuations", limit)) {
-        UserSnapshot snapshot = readUserSnapshot(userId);
-        if (snapshot.hasMissingRequiredField()) {
-            recordHydrationTarget(userId);
-            continue;
-        }
-
-        upsertUserValuationIfNewer(snapshot);
-        srem("dirty:user-valuations", userId);
-    }
-}
+```yaml
+batch:
+  schedule:
+    valuation-write-back:
+      cron: ${BATCH_SCHEDULE_VALUATION_WRITE_BACK_CRON:0/30 * * * * *}
+  write-back:
+    portfolio-size: ${BATCH_WRITE_BACK_PORTFOLIO_SIZE:500}
+    user-size: ${BATCH_WRITE_BACK_USER_SIZE:500}
+    deletion-size: ${BATCH_WRITE_BACK_DELETION_SIZE:500}
+  warm-up:
+    chunk-size: ${BATCH_WARM_UP_CHUNK_SIZE:1000}
 ```
 
-## DB Schema 권장 사항
+운영 기본 write-back 주기는 30초다. backlog가 증가하면 batch size 또는 cron 주기를 조정한다.
 
-현재 worker domain class에는 `updatedAt`, `deleted`, `deletedAt` 필드가 없다.
-하지만 batch DB에는 다음 컬럼을 추가하는 것을 권장한다.
+## Metric
 
-Portfolio valuation:
+현재 노출되는 주요 metric:
 
-| 컬럼 | 타입 | 설명 |
-| --- | --- | --- |
-| portfolio_id | BIGINT | PK |
-| purchased_value | BIGINT | 총 구매액 |
-| current_value | BIGINT | 현재 평가액 |
-| profit_rate | DOUBLE | 수익률 |
-| asset_count | BIGINT | 보유 종목 수 |
-| updated_at | TIMESTAMP | 마지막 write-back snapshot 시각 |
-| deleted | BOOLEAN | soft delete 여부 |
-| deleted_at | TIMESTAMP | soft delete 시각 |
-
-User valuation:
-
-| 컬럼 | 타입 | 설명 |
-| --- | --- | --- |
-| user_id | VARCHAR | PK |
-| purchased_value | BIGINT | 총 구매액 |
-| current_value | BIGINT | 현재 평가액 |
-| profit_rate | DOUBLE | 수익률 |
-| portfolio_count | BIGINT | 보유 포트폴리오 수 |
-| updated_at | TIMESTAMP | 마지막 write-back snapshot 시각 |
-
-## 모니터링 지표
-
-batch 서버는 다음 지표를 노출해야 한다.
-
-| 지표 | 설명 |
+| Metric | 설명 |
 | --- | --- |
-| dirty portfolio backlog | `dirty:portfolio-valuations` 크기 |
-| dirty user backlog | `dirty:user-valuations` 크기 |
-| dirty deletion backlog | `dirty:portfolio-valuation-deletions` 크기 |
-| write-back success count | DB 반영 성공 수 |
-| write-back failure count | DB 반영 실패 수 |
-| snapshot missing count | Redis 필수 필드 누락 수 |
-| batch duration | batch tick 처리 시간 |
+| `valuation.write_back.duration` | write-back tick 처리 시간 |
+| `valuation.write_back.success` | write-back 성공 수 |
+| `valuation.write_back.failure` | write-back 실패 수 |
+| `valuation.write_back.snapshot_missing` | 필수 snapshot 누락 수 |
+| `valuation.warm_up.duration` | warm-up 전체 처리 시간 |
+| `valuation.warm_up.portfolio.chunks` | portfolio warm-up chunk 처리 수 |
+| `valuation.warm_up.user.chunks` | user warm-up chunk 처리 수 |
 
-## 구현 시 주의 사항
+## 주의 사항
 
-- Redis dirty set을 DB 성공 전에 제거하지 않는다.
-- 삭제 대상은 일반 upsert보다 먼저 처리한다.
-- userId는 현재 String이다.
-- soft delete된 portfolio valuation은 일반 upsert로 되살리지 않는다.
-- Redis 필드 값은 문자열로 저장되므로 batch 서버에서 Long, Double, Boolean, Instant로 변환해야 한다.
-- Redis 장애 또는 flush 이후에는 별도 hydration job으로 상태를 복구해야 한다.
+- Warm-up은 dirty set을 등록하지 않는다.
+- Warm-up은 현재가 의존 필드를 쓰지 않는다.
+- Redis 필드 값은 문자열로 저장되므로 write-back에서 Long, Double, Boolean, Instant로 변환한다.
+- Redis 장애 또는 flush 이후에는 `valuation-warm-up`을 먼저 실행한 뒤 worker 트래픽을 정상화한다.
+- `userId`는 worker 기준 String이다. daily snapshot 저장 시 내부 Long userId가 필요한 경우 `UserIdResolver`를 통해 변환한다.

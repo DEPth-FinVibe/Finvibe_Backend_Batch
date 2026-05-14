@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -39,6 +40,7 @@ public class RedisIndexReconciliationScheduler {
 	private final MeterRegistry meterRegistry;
 
 	@Scheduled(fixedRate = 600_000) // 10분
+	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
 	public void reconcile() {
 		log.info("Redis index reconciliation started");
 		long startTime = System.currentTimeMillis();

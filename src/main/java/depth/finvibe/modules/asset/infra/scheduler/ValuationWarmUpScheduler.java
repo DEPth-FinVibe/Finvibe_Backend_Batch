@@ -2,7 +2,6 @@ package depth.finvibe.modules.asset.infra.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,7 +15,6 @@ import depth.finvibe.modules.asset.application.ValuationWarmUpService;
 public class ValuationWarmUpScheduler {
     private final ValuationWarmUpService valuationWarmUpService;
 
-    @SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
     public void executeWarmUp() {
         try {
             valuationWarmUpService.warmUp();
@@ -26,7 +24,6 @@ public class ValuationWarmUpScheduler {
         }
     }
 
-    @SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
     public void executePortfolioStateWarmUp() {
         try {
             valuationWarmUpService.warmUpPortfolioStateStep();
@@ -36,7 +33,6 @@ public class ValuationWarmUpScheduler {
         }
     }
 
-    @SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
     public void executeUserStateWarmUp() {
         try {
             valuationWarmUpService.warmUpUserStateStep();

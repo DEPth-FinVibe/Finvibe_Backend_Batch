@@ -1,5 +1,6 @@
 package depth.finvibe.batch.config;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Locale;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
 import depth.finvibe.modules.asset.infra.scheduler.UserProfitSnapshotScheduler;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationRedisExclusiveLock;
 import depth.finvibe.modules.asset.infra.scheduler.ValuationWarmUpScheduler;
 
 @Slf4j
@@ -25,6 +27,7 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 	private final UserProfitSnapshotScheduler userProfitSnapshotScheduler;
 	private final PortfolioPerformanceSnapshotScheduler portfolioPerformanceSnapshotScheduler;
 	private final ValuationWarmUpScheduler valuationWarmUpScheduler;
+	private final ValuationRedisExclusiveLock valuationRedisExclusiveLock;
 
 	@Value("${batch.manual-trigger.jobs:}")
 	private String manualTriggerJobs;
@@ -47,7 +50,12 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 			switch (job) {
 			case "valuation-warm-up" -> {
 				log.info("Manually triggering valuation warm-up");
-				valuationWarmUpScheduler.executeWarmUp();
+				valuationRedisExclusiveLock.runWithLock(
+					"manual valuation warm-up",
+					Duration.ofHours(2),
+					Duration.ofMinutes(1),
+					valuationWarmUpScheduler::executeWarmUp
+				);
 			}
 			case "user-profit-snapshot" -> {
 				log.info("Manually triggering user profit snapshot for date {}", snapshotDate);
@@ -59,7 +67,12 @@ public class BatchManualTriggerRunner implements ApplicationRunner {
 			}
 			case "all" -> {
 				log.info("Manually triggering all manual batch jobs for date {}", snapshotDate);
-				valuationWarmUpScheduler.executeWarmUp();
+				valuationRedisExclusiveLock.runWithLock(
+					"manual valuation warm-up",
+					Duration.ofHours(2),
+					Duration.ofMinutes(1),
+					valuationWarmUpScheduler::executeWarmUp
+				);
 				userProfitSnapshotScheduler.saveSnapshot(snapshotDate);
 				portfolioPerformanceSnapshotScheduler.saveSnapshot(snapshotDate);
 			}

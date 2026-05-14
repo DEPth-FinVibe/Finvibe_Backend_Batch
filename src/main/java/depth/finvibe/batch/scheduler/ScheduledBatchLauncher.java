@@ -157,13 +157,13 @@ public class ScheduledBatchLauncher {
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-warm-up.cron:0 30 0 * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
-	@SchedulerLock(name = "valuationWarmUp", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
+	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
 	public void executeValuationWarmUp() {
 		scheduledBatchJobSupport.launch(executeValuationWarmUpJob);
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-write-back.cron:0/30 * * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
-	@SchedulerLock(name = "valuationWriteBack", lockAtMostFor = "PT1M", lockAtLeastFor = "PT1S")
+	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT5M", lockAtLeastFor = "PT1S")
 	public void executeValuationWriteBack() {
 		scheduledBatchJobSupport.launch(executeValuationWriteBackJob);
 	}

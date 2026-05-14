@@ -60,6 +60,8 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         set(connection, legacyPortfolioOwnerKey(state.portfolioId()), state.userId());
         set(connection, portfolioKey(state.portfolioId(), "user"), state.userId());
         set(connection, portfolioKey(state.portfolioId(), "purchased-value"), state.purchasedValue());
+        set(connection, portfolioKey(state.portfolioId(), "current-value"), state.currentValue());
+        set(connection, portfolioKey(state.portfolioId(), "profit-rate"), state.profitRate());
         set(connection, portfolioKey(state.portfolioId(), "asset-count"), state.assetCount());
         set(connection, portfolioKey(state.portfolioId(), "deleted"), false);
         set(connection, portfolioKey(state.portfolioId(), "updated-at"), state.updatedAt().toString());
@@ -86,6 +88,8 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
             connection.setCommands().sAdd(bytes(userPortfoliosKey(state.userId())), bytes(portfolioId));
         }
         set(connection, userKey(state.userId(), "purchased-value"), state.purchasedValue());
+        set(connection, userKey(state.userId(), "current-value"), state.currentValue());
+        set(connection, userKey(state.userId(), "profit-rate"), state.profitRate());
         set(connection, userKey(state.userId(), "portfolio-count"), state.portfolioCount());
         set(connection, userKey(state.userId(), "updated-at"), state.updatedAt().toString());
     }

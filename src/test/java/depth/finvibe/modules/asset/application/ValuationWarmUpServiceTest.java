@@ -91,9 +91,13 @@ class ValuationWarmUpServiceTest {
         assertThat(portfolioStates).hasSize(2);
         assertThat(portfolioStates.get(0).portfolioId()).isEqualTo(1L);
         assertThat(portfolioStates.get(0).purchasedValue()).isEqualTo(1500L);
+        assertThat(portfolioStates.get(0).currentValue()).isEqualTo(1500L);
+        assertThat(portfolioStates.get(0).profitRate()).isEqualTo(0D);
         assertThat(portfolioStates.get(0).assetCount()).isEqualTo(1L);
         assertThat(portfolioStates.get(0).holdings()).extracting(PortfolioWarmUpState.Holding::stockId).containsExactly(10L);
         assertThat(portfolioStates.get(1).purchasedValue()).isEqualTo(2500L);
+        assertThat(portfolioStates.get(1).currentValue()).isEqualTo(2500L);
+        assertThat(portfolioStates.get(1).profitRate()).isEqualTo(0D);
         assertThat(portfolioStates.get(1).assetCount()).isEqualTo(1L);
 
         ArgumentCaptor<List<UserWarmUpState>> userStatesCaptor = ArgumentCaptor.forClass(List.class);
@@ -103,6 +107,8 @@ class ValuationWarmUpServiceTest {
         assertThat(userStates).hasSize(1);
         assertThat(userStates.getFirst().userId()).isEqualTo(userId.toString());
         assertThat(userStates.getFirst().purchasedValue()).isEqualTo(4000L);
+        assertThat(userStates.getFirst().currentValue()).isEqualTo(4000L);
+        assertThat(userStates.getFirst().profitRate()).isEqualTo(0D);
         assertThat(userStates.getFirst().portfolioCount()).isEqualTo(2L);
         assertThat(userStates.getFirst().portfolioIds()).containsExactly(1L, 2L);
         verify(entityManager, times(2)).clear();

@@ -149,6 +149,8 @@ public class ValuationWarmUpService {
             portfolio.getId(),
             portfolio.getUserId().toString(),
             purchasedValue,
+            purchasedValue,
+            0D,
             (long) holdings.size(),
             updatedAt,
             holdings
@@ -178,6 +180,8 @@ public class ValuationWarmUpService {
             states.add(new UserWarmUpState(
                 entry.getKey().toString(),
                 purchasedValue,
+                purchasedValue,
+                0D,
                 (long) portfolioIds.size(),
                 updatedAt,
                 portfolioIds

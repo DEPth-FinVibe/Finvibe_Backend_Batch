@@ -8,6 +8,8 @@ public record PortfolioWarmUpState(
     Long portfolioId,
     String userId,
     Long purchasedValue,
+    Long currentValue,
+    Double profitRate,
     Long assetCount,
     Instant updatedAt,
     List<Holding> holdings

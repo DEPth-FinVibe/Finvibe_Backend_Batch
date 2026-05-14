@@ -49,6 +49,8 @@ public class ScheduledBatchLauncher {
 	private final Job saveUserProfitDailySnapshotJob;
 	@Qualifier("savePortfolioPerformanceDailySnapshotJob")
 	private final Job savePortfolioPerformanceDailySnapshotJob;
+	@Qualifier("executeValuationWarmUpJob")
+	private final Job executeValuationWarmUpJob;
 	@Qualifier("executeValuationWriteBackJob")
 	private final Job executeValuationWriteBackJob;
 
@@ -152,6 +154,12 @@ public class ScheduledBatchLauncher {
 	@SchedulerLock(name = "portfolioPerformanceSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void savePortfolioPerformanceDailySnapshot() {
 		scheduledBatchJobSupport.launch(savePortfolioPerformanceDailySnapshotJob);
+	}
+
+	@Scheduled(cron = "${batch.schedule.valuation-warm-up.cron:0 30 0 * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
+	@SchedulerLock(name = "valuationWarmUp", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
+	public void executeValuationWarmUp() {
+		scheduledBatchJobSupport.launch(executeValuationWarmUpJob);
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-write-back.cron:0/30 * * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")

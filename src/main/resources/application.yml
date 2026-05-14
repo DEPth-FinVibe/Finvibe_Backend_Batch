@@ -46,6 +46,8 @@ batch:
       cron: ${BATCH_SCHEDULE_USER_PROFIT_SNAPSHOT_CRON:0 5 * * * *}
     portfolio-performance-snapshot:
       cron: ${BATCH_SCHEDULE_PORTFOLIO_PERFORMANCE_SNAPSHOT_CRON:0 7 * * * *}
+    valuation-warm-up:
+      cron: ${BATCH_SCHEDULE_VALUATION_WARM_UP_CRON:0 30 0 * * *}
     valuation-write-back:
       cron: ${BATCH_SCHEDULE_VALUATION_WRITE_BACK_CRON:0/30 * * * * *}
   snapshot:

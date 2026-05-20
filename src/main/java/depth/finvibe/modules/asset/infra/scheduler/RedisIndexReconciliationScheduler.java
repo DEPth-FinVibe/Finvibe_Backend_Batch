@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +13,8 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import depth.finvibe.modules.asset.domain.Asset;
-import depth.finvibe.modules.asset.domain.PortfolioGroup;
 import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository;
+import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository.PortfolioAssetRow;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository.AssetSnapshot;
 import depth.finvibe.modules.asset.infra.redis.StockHoldingIndexRedisRepository;
@@ -55,13 +53,15 @@ public class RedisIndexReconciliationScheduler {
 				break;
 			}
 
-			List<PortfolioGroup> portfolios = portfolioGroupQueryRepository.findAllWithAssetsByIds(portfolioIds);
-			totalPortfolios += portfolios.size();
+			List<PortfolioAssetRow> rows = portfolioGroupQueryRepository.findPortfolioAssetRowsByIds(portfolioIds);
+			totalPortfolios += portfolioIds.size();
 
 			Map<Long, Set<Long>> dbStockToPortfolios = new HashMap<>();
 
-			for (PortfolioGroup portfolio : portfolios) {
-				fixedCount += reconcilePortfolio(portfolio, dbStockToPortfolios);
+			for (Map.Entry<Long, List<PortfolioAssetRow>> entry : rows.stream()
+					.collect(java.util.stream.Collectors.groupingBy(PortfolioAssetRow::portfolioId))
+					.entrySet()) {
+				fixedCount += reconcilePortfolio(entry.getKey(), entry.getValue(), dbStockToPortfolios);
 			}
 
 			for (Map.Entry<Long, Set<Long>> entry : dbStockToPortfolios.entrySet()) {
@@ -101,10 +101,9 @@ public class RedisIndexReconciliationScheduler {
 				totalPortfolios, fixedCount, elapsed);
 	}
 
-	private int reconcilePortfolio(PortfolioGroup portfolio, Map<Long, Set<Long>> dbStockToPortfolios) {
+	private int reconcilePortfolio(Long portfolioId, List<PortfolioAssetRow> rows, Map<Long, Set<Long>> dbStockToPortfolios) {
 		int fixes = 0;
-		Long portfolioId = portfolio.getId();
-		java.util.UUID portfolioOwner = portfolio.getUserId();
+		java.util.UUID portfolioOwner = rows.get(0).userId();
 		if (portfolioOwner == null) {
 			log.warn("Skip Redis index reconciliation for portfolio with null userId. portfolioId={}", portfolioId);
 			return fixes;
@@ -118,16 +117,18 @@ public class RedisIndexReconciliationScheduler {
 		}
 
 		// 2. portfolio:assets 검증
-		Map<Long, AssetSnapshot> dbSnapshots = portfolio.getAssets().stream()
-				.collect(Collectors.toMap(
-						Asset::getStockId,
-						asset -> new AssetSnapshot(
-								asset.getAmount(),
-								asset.getTotalPrice().getAmount(),
-								asset.getTotalPrice().getCurrency().name()
-						),
-						(a, b) -> a
-				));
+		Map<Long, AssetSnapshot> dbSnapshots = new HashMap<>();
+		for (PortfolioAssetRow row : rows) {
+			if (row.stockId() == null) {
+				continue;
+			}
+
+			dbSnapshots.putIfAbsent(row.stockId(), new AssetSnapshot(
+					row.amount(),
+					row.purchasePriceAmount(),
+					row.currency().name()
+			));
+		}
 
 		Map<Long, AssetSnapshot> redisSnapshots = portfolioAssetSnapshotRedisRepository.getAssets(portfolioId);
 
@@ -137,9 +138,13 @@ public class RedisIndexReconciliationScheduler {
 		}
 
 		// 3. stock:holding 역방향 인덱스 수집
-		for (Asset asset : portfolio.getAssets()) {
+		for (PortfolioAssetRow row : rows) {
+			if (row.stockId() == null) {
+				continue;
+			}
+
 			dbStockToPortfolios
-					.computeIfAbsent(asset.getStockId(), k -> new HashSet<>())
+					.computeIfAbsent(row.stockId(), k -> new HashSet<>())
 					.add(portfolioId);
 		}
 

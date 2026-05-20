@@ -1,12 +1,15 @@
 package depth.finvibe.modules.asset.infra.persistence;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import depth.finvibe.modules.asset.domain.Currency;
 import depth.finvibe.modules.asset.domain.PortfolioGroup;
 
 import static depth.finvibe.modules.asset.domain.QAsset.asset;
@@ -49,6 +52,28 @@ public class PortfolioGroupQueryRepository {
                 .fetch();
     }
 
+    public List<PortfolioAssetRow> findPortfolioAssetRowsByIds(List<Long> portfolioIds) {
+        if (portfolioIds == null || portfolioIds.isEmpty()) {
+            return List.of();
+        }
+
+        return queryFactory
+                .select(Projections.constructor(
+                        PortfolioAssetRow.class,
+                        portfolioGroup.id,
+                        portfolioGroup.userId,
+                        asset.stockId,
+                        asset.amount,
+                        asset.totalPrice.amount,
+                        asset.totalPrice.currency
+                ))
+                .from(portfolioGroup)
+                .leftJoin(portfolioGroup.assets, asset)
+                .where(portfolioGroup.id.in(portfolioIds))
+                .orderBy(portfolioGroup.id.asc(), asset.stockId.asc())
+                .fetch();
+    }
+
     public List<UUID> findUserIdsAfter(UUID lastUserId, int limit) {
         return queryFactory
                 .select(portfolioGroup.userId)
@@ -72,5 +97,15 @@ public class PortfolioGroupQueryRepository {
                 .orderBy(portfolioGroup.userId.asc(), portfolioGroup.id.asc())
                 .distinct()
                 .fetch();
+    }
+
+    public record PortfolioAssetRow(
+            Long portfolioId,
+            UUID userId,
+            Long stockId,
+            BigDecimal amount,
+            BigDecimal purchasePriceAmount,
+            Currency currency
+    ) {
     }
 }

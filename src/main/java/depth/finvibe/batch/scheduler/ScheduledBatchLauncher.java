@@ -1,5 +1,7 @@
 package depth.finvibe.batch.scheduler;
 
+import java.time.Duration;
+
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.batch.core.job.Job;
@@ -8,12 +10,16 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import depth.finvibe.batch.config.ScheduledBatchJobSupport;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationRedisExclusiveLock;
+import depth.finvibe.modules.asset.infra.scheduler.ValuationWarmUpStartupState;
 
 @Component
 @RequiredArgsConstructor
 public class ScheduledBatchLauncher {
 
 	private final ScheduledBatchJobSupport scheduledBatchJobSupport;
+	private final ValuationRedisExclusiveLock valuationRedisExclusiveLock;
+	private final ValuationWarmUpStartupState valuationWarmUpStartupState;
 
 	@Qualifier("updateWeeklySquadRankingJob")
 	private final Job updateWeeklySquadRankingJob;
@@ -157,14 +163,30 @@ public class ScheduledBatchLauncher {
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-warm-up.cron:0 30 0 * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
-	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT2H", lockAtLeastFor = "PT1M")
 	public void executeValuationWarmUp() {
-		scheduledBatchJobSupport.launch(executeValuationWarmUpJob);
+		if (!valuationWarmUpStartupState.isCompleted()) {
+			return;
+		}
+
+		valuationRedisExclusiveLock.runWithLock(
+				"scheduled valuation warm-up",
+				Duration.ofHours(2),
+				Duration.ofMinutes(1),
+				() -> scheduledBatchJobSupport.launch(executeValuationWarmUpJob)
+		);
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-write-back.cron:0/30 * * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
-	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT5M", lockAtLeastFor = "PT1S")
 	public void executeValuationWriteBack() {
-		scheduledBatchJobSupport.launch(executeValuationWriteBackJob);
+		if (!valuationWarmUpStartupState.isCompleted()) {
+			return;
+		}
+
+		valuationRedisExclusiveLock.runWithLock(
+				"scheduled valuation write-back",
+				Duration.ofMinutes(5),
+				Duration.ofSeconds(1),
+				() -> scheduledBatchJobSupport.launch(executeValuationWriteBackJob)
+		);
 	}
 }

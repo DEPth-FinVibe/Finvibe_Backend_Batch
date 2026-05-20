@@ -1,5 +1,6 @@
 package depth.finvibe.modules.asset.infra.scheduler;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -9,7 +10,6 @@ import java.util.Set;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -36,10 +36,24 @@ public class RedisIndexReconciliationScheduler {
 	private final PortfolioAssetSnapshotRedisRepository portfolioAssetSnapshotRedisRepository;
 	private final PortfolioStateRedisRepository portfolioStateRedisRepository;
 	private final MeterRegistry meterRegistry;
+	private final ValuationRedisExclusiveLock valuationRedisExclusiveLock;
+	private final ValuationWarmUpStartupState valuationWarmUpStartupState;
 
 	@Scheduled(fixedRate = 600_000) // 10분
-	@SchedulerLock(name = "valuationRedisExclusive", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
 	public void reconcile() {
+		if (!valuationWarmUpStartupState.isCompleted()) {
+			return;
+		}
+
+		valuationRedisExclusiveLock.runWithLock(
+				"redis index reconciliation",
+				Duration.ofMinutes(30),
+				Duration.ofMinutes(1),
+				this::reconcileWithLock
+		);
+	}
+
+	private void reconcileWithLock() {
 		log.info("Redis index reconciliation started");
 		long startTime = System.currentTimeMillis();
 		int totalPortfolios = 0;

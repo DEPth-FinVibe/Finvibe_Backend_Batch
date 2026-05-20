@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import depth.finvibe.modules.asset.infra.scheduler.PortfolioPerformanceSnapshotScheduler;
@@ -21,6 +23,7 @@ import depth.finvibe.modules.asset.infra.scheduler.ValuationWarmUpScheduler;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@Order(Ordered.LOWEST_PRECEDENCE)
 @ConditionalOnProperty(prefix = "batch.manual-trigger", name = "enabled", havingValue = "true")
 public class BatchManualTriggerRunner implements ApplicationRunner {
 

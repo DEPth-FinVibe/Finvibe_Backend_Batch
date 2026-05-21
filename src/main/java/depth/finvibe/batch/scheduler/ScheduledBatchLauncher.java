@@ -63,108 +63,108 @@ public class ScheduledBatchLauncher {
 	@Scheduled(cron = "0 0 0 * * MON", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_updateWeeklySquadRanking", lockAtMostFor = "PT30M")
 	public void updateWeeklySquadRanking() {
-		scheduledBatchJobSupport.launch(updateWeeklySquadRankingJob);
+		launchAfterStartupWarmUp(updateWeeklySquadRankingJob);
 	}
 
 	@Scheduled(cron = "0 55 23 * * SUN", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_rewardPersonalChallenges", lockAtMostFor = "PT30M")
 	public void rewardPersonalChallenges() {
-		scheduledBatchJobSupport.launch(rewardPersonalChallengesJob);
+		launchAfterStartupWarmUp(rewardPersonalChallengesJob);
 	}
 
 	@Scheduled(cron = "0 58 23 * * SUN", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_rewardWeeklyChallenges", lockAtMostFor = "PT30M")
 	public void rewardWeeklyChallenges() {
-		scheduledBatchJobSupport.launch(rewardWeeklyChallengesJob);
+		launchAfterStartupWarmUp(rewardWeeklyChallengesJob);
 	}
 
 	@Scheduled(cron = "0 5 0 * * MON", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_generatePersonalChallenges", lockAtMostFor = "PT30M")
 	public void generatePersonalChallenges() {
-		scheduledBatchJobSupport.launch(generatePersonalChallengesJob);
+		launchAfterStartupWarmUp(generatePersonalChallengesJob);
 	}
 
 	@Scheduled(cron = "0 */10 * * * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "gamification_refreshUserRankingSnapshots", lockAtMostFor = "PT30M")
 	public void refreshUserRankingSnapshots() {
-		scheduledBatchJobSupport.launch(refreshUserRankingSnapshotsJob);
+		launchAfterStartupWarmUp(refreshUserRankingSnapshotsJob);
 	}
 
 	@Scheduled(cron = "${news.crawler.cron:0 0 0 * * *}", zone = "Asia/Seoul")
 	@SchedulerLock(name = "NewsModuleScheduler.syncLatestNews", lockAtLeastFor = "PT1M", lockAtMostFor = "PT2H")
 	public void syncLatestNews() {
-		scheduledBatchJobSupport.launch(syncLatestNewsJob);
+		launchAfterStartupWarmUp(syncLatestNewsJob);
 	}
 
 	@Scheduled(cron = "0 0 */3 * * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "NewsModuleScheduler.syncDiscussionCounts", lockAtLeastFor = "PT30S", lockAtMostFor = "PT30M")
 	public void syncDiscussionCounts() {
-		scheduledBatchJobSupport.launch(syncDiscussionCountsJob);
+		launchAfterStartupWarmUp(syncDiscussionCountsJob);
 	}
 
 	@Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "closingPriceCleanup", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
 	public void cleanupClosingPriceOnMarketOpen() {
-		scheduledBatchJobSupport.launch(cleanupClosingPriceOnMarketOpenJob);
+		launchAfterStartupWarmUp(cleanupClosingPriceOnMarketOpenJob);
 	}
 
 	@Scheduled(cron = "0 0 * * * *")
 	@SchedulerLock(name = "batchPriceUpdate", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
 	public void executeBatchPriceUpdate() {
-		scheduledBatchJobSupport.launch(executeBatchPriceUpdateJob);
+		launchAfterStartupWarmUp(executeBatchPriceUpdateJob);
 	}
 
 	@Scheduled(cron = "${market.index-cache.cron:0 * * * * *}")
 	@SchedulerLock(name = "indexMinuteCandleCache", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
 	public void cacheIndexMinuteCandles() {
-		scheduledBatchJobSupport.launch(cacheIndexMinuteCandlesJob);
+		launchAfterStartupWarmUp(cacheIndexMinuteCandlesJob);
 	}
 
 	@Scheduled(cron = "0 0 2 1 * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "holidayCalendarScheduler", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
 	public void ensureNextMonthHolidayCalendar() {
-		scheduledBatchJobSupport.launch(ensureNextMonthHolidayCalendarJob);
+		launchAfterStartupWarmUp(ensureNextMonthHolidayCalendarJob);
 	}
 
 	@Scheduled(cron = "0 */10 * * * *")
 	@SchedulerLock(name = "stockRankingUpdate", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
 	public void executeStockRankingUpdate() {
-		scheduledBatchJobSupport.launch(executeStockRankingUpdateJob);
+		launchAfterStartupWarmUp(executeStockRankingUpdateJob);
 	}
 
 	@Scheduled(cron = "0 0 2 * * *")
 	@SchedulerLock(name = "stockBulkUpsert", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
 	public void executeStockBulkUpsert() {
-		scheduledBatchJobSupport.launch(executeStockBulkUpsertJob);
+		launchAfterStartupWarmUp(executeStockBulkUpsertJob);
 	}
 
 	@Scheduled(cron = "0 0 0 * * MON", zone = "Asia/Seoul")
 	@SchedulerLock(name = "userProfitRankingWeeklyBadge", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void rewardWeeklyTopOnePercentBadge() {
-		scheduledBatchJobSupport.launch(rewardWeeklyTopOnePercentBadgeJob);
+		launchAfterStartupWarmUp(rewardWeeklyTopOnePercentBadgeJob);
 	}
 
 	@Scheduled(cron = "0 0 0 1 * *", zone = "Asia/Seoul")
 	@SchedulerLock(name = "userProfitRankingMonthlyBadge", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void rewardMonthlyTopOnePercentBadge() {
-		scheduledBatchJobSupport.launch(rewardMonthlyTopOnePercentBadgeJob);
+		launchAfterStartupWarmUp(rewardMonthlyTopOnePercentBadgeJob);
 	}
 
 	@Scheduled(cron = "${batch.schedule.user-profit-snapshot.cron:0 5 * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	@SchedulerLock(name = "userProfitSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void saveUserProfitDailySnapshot() {
-		scheduledBatchJobSupport.launch(saveUserProfitDailySnapshotJob);
+		launchAfterStartupWarmUp(saveUserProfitDailySnapshotJob);
 	}
 
 	@Scheduled(cron = "${batch.schedule.portfolio-performance-snapshot.cron:0 7 * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	@SchedulerLock(name = "portfolioPerformanceSnapshotDaily", lockAtMostFor = "PT10M", lockAtLeastFor = "PT10S")
 	public void savePortfolioPerformanceDailySnapshot() {
-		scheduledBatchJobSupport.launch(savePortfolioPerformanceDailySnapshotJob);
+		launchAfterStartupWarmUp(savePortfolioPerformanceDailySnapshotJob);
 	}
 
 	@Scheduled(cron = "${batch.schedule.valuation-warm-up.cron:0 30 0 * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	public void executeValuationWarmUp() {
-		if (!valuationWarmUpStartupState.isCompleted()) {
+		if (shouldSkipUntilStartupWarmUpCompleted()) {
 			return;
 		}
 
@@ -178,7 +178,7 @@ public class ScheduledBatchLauncher {
 
 	@Scheduled(cron = "${batch.schedule.valuation-write-back.cron:0/30 * * * * *}", zone = "${batch.schedule.zone:Asia/Seoul}")
 	public void executeValuationWriteBack() {
-		if (!valuationWarmUpStartupState.isCompleted()) {
+		if (shouldSkipUntilStartupWarmUpCompleted()) {
 			return;
 		}
 
@@ -188,5 +188,17 @@ public class ScheduledBatchLauncher {
 				Duration.ofSeconds(1),
 				() -> scheduledBatchJobSupport.launch(executeValuationWriteBackJob)
 		);
+	}
+
+	private void launchAfterStartupWarmUp(Job job) {
+		if (shouldSkipUntilStartupWarmUpCompleted()) {
+			return;
+		}
+
+		scheduledBatchJobSupport.launch(job);
+	}
+
+	private boolean shouldSkipUntilStartupWarmUpCompleted() {
+		return !valuationWarmUpStartupState.isCompleted();
 	}
 }

@@ -11,7 +11,9 @@ import java.util.UUID;
 public interface UserRepository {
     User save(User user);
 
-    Optional<User> findById(UUID id);
+    Optional<User> findById(Long id);
+
+    Optional<User> findByExternalUserId(UUID externalUserId);
 
     Optional<User> findByInternalUserId(Long internalUserId);
 

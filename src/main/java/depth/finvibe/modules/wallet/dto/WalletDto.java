@@ -17,7 +17,7 @@ public class WalletDto {
     @Builder
     public static class WalletResponse {
         private Long walletId;
-        private UUID userId;
+        private Long userId;
         private Long balance;
 
         public static WalletResponse from(Wallet wallet) {

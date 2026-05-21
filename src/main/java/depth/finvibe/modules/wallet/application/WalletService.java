@@ -20,13 +20,13 @@ public class WalletService implements WalletQueryUseCase {
     private final MeterRegistry meterRegistry;
 
     @Override
-    public WalletDto.WalletResponse getWalletByUserId(UUID userId) {
+    public WalletDto.WalletResponse getWalletByUserId(Long userId) {
         Wallet wallet = findWallet(userId);
 
         return WalletDto.WalletResponse.from(wallet);
     }
 
-    private Wallet findWallet(UUID userId) {
+    private Wallet findWallet(Long userId) {
         return walletRepository.findByUserId(userId)
                 .orElseThrow(() -> {
                     meterRegistry.counter("wallet.wallet.not_found").increment();

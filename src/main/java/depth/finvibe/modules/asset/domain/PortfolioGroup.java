@@ -46,7 +46,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
 
     private String name;
 
-    private UUID userId;
+    private Long userId;
 
     private String iconCode;
 
@@ -66,7 +66,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
     })
     private PortfolioValuation valuation;
 
-    public static PortfolioGroup create(String name, UUID userId, String iconCode) {
+    public static PortfolioGroup create(String name, Long userId, String iconCode) {
         if(name == null || name.isBlank() || userId == null) {
             throw new DomainException(AssetErrorCode.INVALID_PORTFOLIO_GROUP_PARAMS);
         }
@@ -78,7 +78,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
             .build();
     }
 
-    public static PortfolioGroup createDefault(UUID userId) {
+    public static PortfolioGroup createDefault(Long userId) {
         if(userId == null) {
             throw new DomainException(AssetErrorCode.INVALID_PORTFOLIO_GROUP_PARAMS);
         }
@@ -104,7 +104,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
         }
     }
 
-    public void register(Asset asset, UUID requesterId) {
+    public void register(Asset asset, Long requesterId) {
         if(!this.userId.equals(requesterId)) {
             throw new DomainException(AssetErrorCode.ONLY_OWNER_CAN_REGISTER_ASSET);
         }
@@ -121,7 +121,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
         }
     }
 
-    public Optional<Long> unregister(Long stockId, BigDecimal amount, Money paidMoney, UUID requesterId) {
+    public Optional<Long> unregister(Long stockId, BigDecimal amount, Money paidMoney, Long requesterId) {
         if(!this.userId.equals(requesterId)) {
             throw new DomainException(AssetErrorCode.ONLY_OWNER_CAN_UNREGISTER_ASSET);
         }
@@ -153,7 +153,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
         return amount.abs().compareTo(AMOUNT_ZERO_THRESHOLD) <= 0;
     }
 
-    public void ensureDeletable(UUID requesterUserId) {
+    public void ensureDeletable(Long requesterUserId) {
         if(this.isDefault) {
             throw new DomainException(AssetErrorCode.CANNOT_DELETE_DEFAULT_PORTFOLIO_GROUP);
         }
@@ -186,7 +186,7 @@ public class PortfolioGroup extends TimeStampedBaseEntity {
         return mergedSourceAssetIds;
     }
 
-    public Optional<Long> transferAssetTo(Long assetId, PortfolioGroup targetGroup, UUID requesterId) {
+    public Optional<Long> transferAssetTo(Long assetId, PortfolioGroup targetGroup, Long requesterId) {
         if (!this.userId.equals(requesterId) || !targetGroup.userId.equals(requesterId)) {
             throw new DomainException(AssetErrorCode.ONLY_OWNER_CAN_TRANSFER_ASSET);
         }

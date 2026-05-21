@@ -27,12 +27,12 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
     }
 
     @Override
-    public List<UserXpAward> findByUserId(UUID userId) {
+    public List<UserXpAward> findByUserId(Long userId) {
         return userXpAwardJpaRepository.findByUserId(userId);
     }
 
     @Override
-    public List<UUID> findTopUsersByTotalXp(int limit) {
+    public List<Long> findTopUsersByTotalXp(int limit) {
         QUserXpAward userXpAward = QUserXpAward.userXpAward;
 
         return jpaQueryFactory.select(userXpAward.userId)
@@ -48,7 +48,7 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
             LocalDateTime startInclusive,
             LocalDateTime endExclusive,
             Long lastXp,
-            UUID lastUserId,
+            Long lastUserId,
             int limit) {
         QUserXpAward userXpAward = QUserXpAward.userXpAward;
         var totalXp = userXpAward.xp.value.sum();
@@ -75,8 +75,8 @@ public class UserXpAwardRepositoryImpl implements UserXpAwardRepository {
     }
 
     @Override
-    public Map<UUID, Long> findUserPeriodXpMapBetween(
-            List<UUID> userIds,
+    public Map<Long, Long> findUserPeriodXpMapBetween(
+            List<Long> userIds,
             LocalDateTime startInclusive,
             LocalDateTime endExclusive) {
         if (userIds.isEmpty()) {

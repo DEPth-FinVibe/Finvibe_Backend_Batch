@@ -1,7 +1,5 @@
 package depth.finvibe.boot.security;
 
-import java.util.UUID;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,10 +11,10 @@ import depth.finvibe.modules.user.domain.enums.UserRole;
 @Getter
 public class Requester {
 
-	private UUID userId;
+	private Long userId;
 	private UserRole role;
 
-	public UUID getUuid() {
+	public Long getUuid() {
 		return userId;
 	}
 }

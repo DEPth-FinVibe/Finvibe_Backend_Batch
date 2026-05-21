@@ -38,7 +38,7 @@ public class MetricService implements MetricCommandUseCase {
 
     @Override
     @Transactional
-    public void updateUserMetric(UserMetricType metricType, UUID userId, Double delta, Instant occurredAt) {
+    public void updateUserMetric(UserMetricType metricType, Long userId, Double delta, Instant occurredAt) {
         if (metricType == null) {
             throw new DomainException(GamificationErrorCode.INVALID_METRIC_TYPE);
         }
@@ -71,7 +71,7 @@ public class MetricService implements MetricCommandUseCase {
         metricRepository.deleteAllByCollectPeriod(CollectPeriod.WEEKLY);
     }
 
-    private void updateLoginStreak(UUID userId, Instant occurredAt) {
+    private void updateLoginStreak(Long userId, Instant occurredAt) {
         if (occurredAt == null) {
             return;
         }
@@ -111,7 +111,7 @@ public class MetricService implements MetricCommandUseCase {
     }
 
     private void updateWeeklyMetric(
-            UUID userId,
+            Long userId,
             UserMetricType metricType,
             double increase,
             Map<CollectPeriod, UserMetric> metricsByPeriod) {
@@ -123,7 +123,7 @@ public class MetricService implements MetricCommandUseCase {
         metricRepository.upsertValue(userId, metricType, CollectPeriod.WEEKLY, updatedValue);
     }
 
-    private void saveMetric(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
+    private void saveMetric(Long userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
         metricRepository.upsertValue(userId, metricType, collectPeriod, value);
     }
 
@@ -137,7 +137,7 @@ public class MetricService implements MetricCommandUseCase {
                 || metricType == UserMetricType.HOLDING_STOCK_COUNT;
     }
 
-    private void evaluateBadgeByMetric(UUID userId, UserMetricType metricType, double value) {
+    private void evaluateBadgeByMetric(Long userId, UserMetricType metricType, double value) {
         if (metricType == UserMetricType.AI_CONTENT_COMPLETE_COUNT && value >= KNOWLEDGE_SEEKER_TARGET) {
             grantBadgeIfAbsent(userId, Badge.KNOWLEDGE_SEEKER);
         }
@@ -155,7 +155,7 @@ public class MetricService implements MetricCommandUseCase {
         }
     }
 
-    private void grantBadgeIfAbsent(UUID userId, Badge badge) {
+    private void grantBadgeIfAbsent(Long userId, Badge badge) {
         badgeCommandUseCase.grantBadgeToUser(userId, badge);
     }
 }

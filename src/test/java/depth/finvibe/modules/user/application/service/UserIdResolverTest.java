@@ -50,7 +50,7 @@ class UserIdResolverTest {
         UserIdResolver resolver = new UserIdResolver(userIdCacheRepository, userRepository);
 
         when(userIdCacheRepository.findInternalUserIdByExternalUserId(externalUserId)).thenReturn(Optional.empty());
-        when(userRepository.findById(externalUserId)).thenReturn(Optional.of(user));
+        when(userRepository.findByExternalUserId(externalUserId)).thenReturn(Optional.of(user));
 
         Long result = resolver.resolveInternalUserId(externalUserId);
 
@@ -64,7 +64,7 @@ class UserIdResolverTest {
         UserIdResolver resolver = new UserIdResolver(userIdCacheRepository, userRepository);
 
         when(userIdCacheRepository.findInternalUserIdByExternalUserId(externalUserId)).thenReturn(Optional.empty());
-        when(userRepository.findById(externalUserId)).thenReturn(Optional.empty());
+        when(userRepository.findByExternalUserId(externalUserId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> resolver.resolveInternalUserId(externalUserId))
             .isInstanceOf(DomainException.class);

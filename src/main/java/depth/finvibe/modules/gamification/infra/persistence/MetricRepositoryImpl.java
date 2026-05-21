@@ -22,14 +22,14 @@ public class MetricRepositoryImpl implements MetricRepository {
     private final MetricJpaRepository metricJpaRepository;
 
     @Override
-    public List<UUID> findUsersAchieved(UserMetricType metricType, CollectPeriod collectPeriod, Double targetValue) {
+    public List<Long> findUsersAchieved(UserMetricType metricType, CollectPeriod collectPeriod, Double targetValue) {
         return metricJpaRepository.findByTypeAndCollectPeriodAndValueGreaterThanEqual(metricType, collectPeriod, targetValue).stream()
                 .map(UserMetric::getUserId)
                 .toList();
     }
 
     @Override
-    public List<UUID> findTopUsersByMetric(UserMetricType metricType, CollectPeriod collectPeriod, int limit) {
+    public List<Long> findTopUsersByMetric(UserMetricType metricType, CollectPeriod collectPeriod, int limit) {
         return metricJpaRepository.findByTypeAndCollectPeriodOrderByValueDesc(
                         metricType,
                         collectPeriod,
@@ -40,13 +40,13 @@ public class MetricRepositoryImpl implements MetricRepository {
     }
 
     @Override
-    public Optional<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type, CollectPeriod collectPeriod) {
+    public Optional<UserMetric> findByUserIdAndType(Long userId, UserMetricType type, CollectPeriod collectPeriod) {
         return metricJpaRepository.findByUserIdAndTypeAndCollectPeriod(userId, type, collectPeriod);
     }
 
     @Override
     public Map<UserMetricType, UserMetric> findByUserIdAndCollectPeriodAndTypes(
-            UUID userId,
+            Long userId,
             CollectPeriod collectPeriod,
             List<UserMetricType> metricTypes) {
         if (metricTypes == null || metricTypes.isEmpty()) {
@@ -58,7 +58,7 @@ public class MetricRepositoryImpl implements MetricRepository {
     }
 
     @Override
-    public Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(UUID userId, UserMetricType metricType) {
+    public Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(Long userId, UserMetricType metricType) {
         return metricJpaRepository.findByUserIdAndType(userId, metricType).stream()
                 .collect(Collectors.toMap(UserMetric::getCollectPeriod, Function.identity()));
     }
@@ -69,7 +69,7 @@ public class MetricRepositoryImpl implements MetricRepository {
     }
 
     @Override
-    public void upsertValue(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
+    public void upsertValue(Long userId, UserMetricType metricType, CollectPeriod collectPeriod, double value) {
         int updatedRowCount = metricJpaRepository.updateValue(userId, metricType, collectPeriod, value);
         if (updatedRowCount > 0) {
             return;

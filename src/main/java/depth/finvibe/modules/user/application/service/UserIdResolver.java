@@ -34,7 +34,7 @@ public class UserIdResolver {
     }
 
     private Optional<Long> loadAndCacheInternalUserIdIfPresent(UUID externalUserId) {
-        Optional<User> foundUser = userRepository.findById(externalUserId);
+        Optional<User> foundUser = userRepository.findByExternalUserId(externalUserId);
         if (foundUser.isEmpty()) {
             return Optional.empty();
         }

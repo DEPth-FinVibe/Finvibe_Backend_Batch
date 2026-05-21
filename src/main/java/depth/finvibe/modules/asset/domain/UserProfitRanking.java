@@ -44,7 +44,7 @@ public class UserProfitRanking {
     private Long id;
 
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private Long userId;
 
     private String userNickname;
 
@@ -65,7 +65,7 @@ public class UserProfitRanking {
     private LocalDateTime updatedAt;
 
     public static UserProfitRanking create(
-            UUID userId,
+            Long userId,
             String userNickname,
             UserProfitRankType rankType,
             BigDecimal totalReturnRate,

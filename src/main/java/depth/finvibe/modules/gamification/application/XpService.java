@@ -50,7 +50,7 @@ public class XpService implements XpCommandUseCase {
 
     @Override
     @Transactional
-    public void grantUserXp(UUID userId, Long value, String reason) {
+    public void grantUserXp(Long userId, Long value, String reason) {
         Xp xp = Xp.of(value, reason);
         UserXpAward userXpAward = UserXpAward.of(userId, xp);
         userXpAwardRepository.save(userXpAward);
@@ -74,13 +74,13 @@ public class XpService implements XpCommandUseCase {
         refreshUserRankingSnapshotByPeriod(RankingPeriod.MONTHLY, now);
     }
 
-    private void updateUserXp(UUID userId, Long amount) {
+    private void updateUserXp(Long userId, Long amount) {
         UserXp userXp = findOrCreateUserXp(userId);
         userXp.addXp(amount);
         userXpRepository.save(userXp);
     }
 
-    private void updateSquadXp(UUID userId, Long amount) {
+    private void updateSquadXp(Long userId, Long amount) {
         userSquadRepository.findSquadIdByUserId(userId).ifPresent(squadId -> {
             if (squadId == null) {
                 log.warn("스쿼드 XP 갱신 생략 - 사용자 스쿼드 정보가 유효하지 않음: {}", userId);
@@ -90,7 +90,7 @@ public class XpService implements XpCommandUseCase {
         });
     }
 
-    private UserXp findOrCreateUserXp(UUID userId) {
+    private UserXp findOrCreateUserXp(Long userId) {
         var existingUserXp = userXpRepository.findByUserId(userId);
         if (existingUserXp.isPresent()) {
             return existingUserXp.get();
@@ -175,7 +175,7 @@ public class XpService implements XpCommandUseCase {
         userXpRankingSnapshotRepository.deleteSnapshots(rankingPeriod, currentStart.toLocalDate());
 
         Long lastXp = null;
-        UUID lastUserId = null;
+        Long lastUserId = null;
         int ranking = 1;
         while (true) {
             List<UserXpAwardRepository.UserPeriodXp> rankedUsers = userXpAwardRepository
@@ -202,16 +202,16 @@ public class XpService implements XpCommandUseCase {
                 continue;
             }
 
-            List<UUID> userIds = uniqueRankedUsers.stream()
+            List<Long> userIds = uniqueRankedUsers.stream()
                     .map(UserXpAwardRepository.UserPeriodXp::userId)
                     .toList();
 
-            Map<UUID, Long> previousXpMap = userXpAwardRepository.findUserPeriodXpMapBetween(
+            Map<Long, Long> previousXpMap = userXpAwardRepository.findUserPeriodXpMapBetween(
                     userIds,
                     previousStart,
                     currentStart);
 
-            Map<UUID, UserXp> userXpMap = new HashMap<>();
+            Map<Long, UserXp> userXpMap = new HashMap<>();
             for (UserXp userXp : userXpRepository.findAllByUserIdIn(userIds)) {
                 userXpMap.put(userXp.getUserId(), userXp);
             }
@@ -243,7 +243,7 @@ public class XpService implements XpCommandUseCase {
             List<UserXpAwardRepository.UserPeriodXp> rankedUsers,
             RankingPeriod rankingPeriod,
             LocalDate periodStartDate) {
-        LinkedHashMap<UUID, UserXpAwardRepository.UserPeriodXp> deduplicated = new LinkedHashMap<>();
+        LinkedHashMap<Long, UserXpAwardRepository.UserPeriodXp> deduplicated = new LinkedHashMap<>();
 
         for (UserXpAwardRepository.UserPeriodXp rankedUser : rankedUsers) {
             deduplicated.putIfAbsent(rankedUser.userId(), rankedUser);

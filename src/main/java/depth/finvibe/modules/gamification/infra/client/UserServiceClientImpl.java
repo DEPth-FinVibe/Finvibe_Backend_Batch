@@ -8,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +18,7 @@ public class UserServiceClientImpl implements UserServiceClient {
     private final UserQueryUseCase userQueryUseCase;
 
     @Override
-    public Optional<String> getNickname(UUID userId) {
+    public Optional<String> getNickname(Long userId) {
         try {
             return Optional.ofNullable(userQueryUseCase.getNickname(userId));
         } catch (Exception exception) {
@@ -28,14 +27,14 @@ public class UserServiceClientImpl implements UserServiceClient {
     }
 
     @Override
-    public Map<UUID, String> getNicknamesByIds(Collection<UUID> userIds) {
-        List<UUID> ids = new ArrayList<>(userIds);
+    public Map<Long, String> getNicknamesByIds(Collection<Long> userIds) {
+        List<Long> ids = new ArrayList<>(userIds);
         if (ids.isEmpty()) {
             return Map.of();
         }
 
-        Map<UUID, String> nicknames = new LinkedHashMap<>();
-        for (UUID userId : ids) {
+        Map<Long, String> nicknames = new LinkedHashMap<>();
+        for (Long userId : ids) {
             getNickname(userId).ifPresent(nickname -> nicknames.put(userId, nickname));
         }
         return nicknames;

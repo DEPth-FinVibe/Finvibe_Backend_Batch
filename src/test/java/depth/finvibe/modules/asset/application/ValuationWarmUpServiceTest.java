@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.persistence.EntityManager;
@@ -60,7 +59,7 @@ class ValuationWarmUpServiceTest {
 
     @Test
     void warmsUpPortfolioAndUserStateInKeysetChunksWithoutCurrentPriceFields() {
-        UUID userId = UUID.randomUUID();
+        Long userId = 1L;
         PortfolioGroup portfolio1 = PortfolioGroup.builder()
             .id(1L)
             .userId(userId)

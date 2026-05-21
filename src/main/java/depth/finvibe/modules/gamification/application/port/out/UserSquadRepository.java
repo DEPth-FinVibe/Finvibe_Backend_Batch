@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface UserSquadRepository {
     void save(UserSquad userSquad);
-    Optional<UserSquad> findByUserId(UUID userId);
-    Optional<Long> findSquadIdByUserId(UUID userId);
+    Optional<UserSquad> findByUserId(Long userId);
+    Optional<Long> findSquadIdByUserId(Long userId);
     List<UserSquad> findAllBySquadId(Long squadId);
 }

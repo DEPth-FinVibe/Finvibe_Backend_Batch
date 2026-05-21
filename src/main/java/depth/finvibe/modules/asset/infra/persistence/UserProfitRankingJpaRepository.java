@@ -14,7 +14,7 @@ import depth.finvibe.modules.asset.domain.enums.UserProfitRankType;
 public interface UserProfitRankingJpaRepository extends JpaRepository<UserProfitRanking, Long> {
   void deleteByRankType(UserProfitRankType rankType);
 
-  Optional<UserProfitRanking> findByRankTypeAndUserId(UserProfitRankType rankType, UUID userId);
+  Optional<UserProfitRanking> findByRankTypeAndUserId(UserProfitRankType rankType, Long userId);
 
   List<UserProfitRanking> findByRankTypeOrderByRankAsc(UserProfitRankType rankType);
 

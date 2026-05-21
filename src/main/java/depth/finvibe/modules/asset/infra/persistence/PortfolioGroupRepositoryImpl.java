@@ -47,12 +47,12 @@ public class PortfolioGroupRepositoryImpl implements PortfolioGroupRepository {
     }
 
     @Override
-    public List<UUID> findUserIdsAfter(UUID lastUserId, int limit) {
+    public List<Long> findUserIdsAfter(Long lastUserId, int limit) {
         return queryRepository.findUserIdsAfter(lastUserId, limit);
     }
 
     @Override
-    public List<PortfolioGroup> findAllWithAssetsByUserIds(List<UUID> userIds) {
+    public List<PortfolioGroup> findAllWithAssetsByUserIds(List<Long> userIds) {
         return queryRepository.findAllWithAssetsByUserIds(userIds);
     }
 

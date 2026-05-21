@@ -11,11 +11,11 @@ import org.springframework.data.jpa.repository.Query;
 import depth.finvibe.modules.gamification.domain.UserXp;
 
 public interface UserXpJpaRepository extends JpaRepository<UserXp, UUID> {
-    Optional<UserXp> findByUserId(UUID userId);
+    Optional<UserXp> findByUserId(Long userId);
 
-    List<UserXp> findAllByUserIdInOrderByWeeklyXpDesc(List<UUID> userIds);
+    List<UserXp> findAllByUserIdInOrderByWeeklyXpDesc(List<Long> userIds);
 
-    List<UserXp> findAllByUserIdIn(List<UUID> userIds);
+    List<UserXp> findAllByUserIdIn(List<Long> userIds);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update UserXp userXp set userXp.weeklyXp = 0")

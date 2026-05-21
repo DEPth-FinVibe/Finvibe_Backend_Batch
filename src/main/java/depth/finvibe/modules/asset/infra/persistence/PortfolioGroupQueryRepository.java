@@ -74,7 +74,7 @@ public class PortfolioGroupQueryRepository {
                 .fetch();
     }
 
-    public List<UUID> findUserIdsAfter(UUID lastUserId, int limit) {
+    public List<Long> findUserIdsAfter(Long lastUserId, int limit) {
         return queryFactory
                 .select(portfolioGroup.userId)
                 .distinct()
@@ -85,7 +85,7 @@ public class PortfolioGroupQueryRepository {
                 .fetch();
     }
 
-    public List<PortfolioGroup> findAllWithAssetsByUserIds(List<UUID> userIds) {
+    public List<PortfolioGroup> findAllWithAssetsByUserIds(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return List.of();
         }

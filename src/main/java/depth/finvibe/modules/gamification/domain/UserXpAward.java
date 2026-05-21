@@ -26,12 +26,12 @@ public class UserXpAward extends TimeStampedBaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private UUID userId;
+    private Long userId;
 
     @Embedded
     private Xp xp;
 
-    public static UserXpAward of(UUID userId, Xp xp) {
+    public static UserXpAward of(Long userId, Xp xp) {
         return UserXpAward.builder()
                 .userId(userId)
                 .xp(xp)

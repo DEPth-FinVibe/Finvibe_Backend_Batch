@@ -80,8 +80,8 @@ public class PortfolioPerformanceSnapshotService {
       return Optional.empty();
     }
 
-    Optional<Long> internalUserId = userIdResolver.resolveInternalUserIdIfPresent(portfolio.getUserId());
-    if (internalUserId.isEmpty()) {
+    Long internalUserId = portfolio.getUserId();
+    if (internalUserId == null) {
       log.warn("Skip portfolio performance snapshot for unresolved user. portfolioId={}, userId={}, snapshotDate={}",
         portfolio.getId(), portfolio.getUserId(), snapshotDate);
       return Optional.empty();
@@ -93,7 +93,7 @@ public class PortfolioPerformanceSnapshotService {
 
     return Optional.of(PortfolioPerformanceSnapshotDaily.create(
       new PortfolioPerformanceSnapshotDailyId(portfolio.getId(), snapshotDate),
-      internalUserId.get(),
+      internalUserId,
       portfolio.getName(),
       totalCurrentValue,
       totalProfitLoss,

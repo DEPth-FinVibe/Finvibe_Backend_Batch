@@ -28,5 +28,5 @@ public interface UserXpRankingSnapshotRepository {
     Optional<UserXpRankingSnapshot> findByPeriodAndUserId(
             RankingPeriod periodType,
             LocalDate periodStartDate,
-            UUID userId);
+            Long userId);
 }

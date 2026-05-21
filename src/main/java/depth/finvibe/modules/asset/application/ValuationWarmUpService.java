@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -133,7 +132,7 @@ public class ValuationWarmUpService {
     }
 
     private WarmUpResult warmUpUserStates() {
-        UUID lastUserId = null;
+        Long lastUserId = null;
         long userCount = 0L;
         long chunkCount = 0L;
         Instant phaseStartedAt = Instant.now();
@@ -141,7 +140,7 @@ public class ValuationWarmUpService {
         log.info("Valuation user warm-up started. chunkSize={}", chunkSize);
 
         while (true) {
-            List<UUID> userIds = portfolioGroupRepository.findUserIdsAfter(lastUserId, chunkSize);
+            List<Long> userIds = portfolioGroupRepository.findUserIdsAfter(lastUserId, chunkSize);
             if (userIds.isEmpty()) {
                 log.info(
                     "Valuation user warm-up completed. chunks={}, users={}, elapsedMs={}",
@@ -209,12 +208,12 @@ public class ValuationWarmUpService {
     }
 
     private List<UserWarmUpState> toUserWarmUpStates(List<PortfolioGroup> portfolios, Instant updatedAt) {
-        Map<UUID, List<PortfolioGroup>> portfoliosByUserId = portfolios.stream()
+        Map<Long, List<PortfolioGroup>> portfoliosByUserId = portfolios.stream()
             .filter(portfolio -> portfolio.getUserId() != null)
             .collect(Collectors.groupingBy(PortfolioGroup::getUserId));
 
         List<UserWarmUpState> states = new ArrayList<>(portfoliosByUserId.size());
-        for (Map.Entry<UUID, List<PortfolioGroup>> entry : portfoliosByUserId.entrySet()) {
+        for (Map.Entry<Long, List<PortfolioGroup>> entry : portfoliosByUserId.entrySet()) {
             List<PortfolioGroup> userPortfolios = entry.getValue();
             long purchasedValue = userPortfolios.stream()
                 .flatMap(portfolio -> portfolio.getAssets().stream())

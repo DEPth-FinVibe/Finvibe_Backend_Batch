@@ -118,13 +118,13 @@ public class User extends TimeStampedBaseEntity {
         }
     }
 
-    public void validateUpdatable(UUID requesterId, UserRole requesterRole) {
-        if (!this.externalUserId.equals(requesterId) && requesterRole != UserRole.ADMIN) {
+    public void validateUpdatable(Long requesterId, UserRole requesterRole) {
+        if (!this.internalUserId.equals(requesterId) && requesterRole != UserRole.ADMIN) {
             throw new DomainException(UserErrorCode.UNAUTHORIZED_USER_UPDATE);
         }
     }
 
-    public UUID getId() {
-        return externalUserId;
+    public Long getId() {
+        return internalUserId;
     }
 }

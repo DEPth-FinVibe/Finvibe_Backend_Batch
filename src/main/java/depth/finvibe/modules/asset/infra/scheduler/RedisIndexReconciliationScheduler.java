@@ -14,11 +14,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository;
-import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository.PortfolioAssetRow;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository.AssetSnapshot;
 import depth.finvibe.modules.asset.infra.redis.StockHoldingIndexRedisRepository;
-import depth.finvibe.modules.asset.infra.redis.PortfolioStateRedisRepository;
 
 /**
  * DB ↔ Redis 인덱스 정합성 검증 및 보정 배치.
@@ -117,14 +115,15 @@ public class RedisIndexReconciliationScheduler {
 
 	private int reconcilePortfolio(Long portfolioId, List<PortfolioAssetRow> rows, Map<Long, Set<Long>> dbStockToPortfolios) {
 		int fixes = 0;
-		java.util.UUID portfolioOwner = rows.get(0).userId();
+		Long portfolioId = portfolio.getId();
+		Long portfolioOwner = portfolio.getUserId();
 		if (portfolioOwner == null) {
 			log.warn("Skip Redis index reconciliation for portfolio with null userId. portfolioId={}", portfolioId);
 			return fixes;
 		}
 
-		// 1. pf:{portfolioId}.u owner 검증
-		java.util.UUID redisOwner = portfolioStateRedisRepository.getOwner(portfolioId);
+		// 1. portfolio:owner 검증
+		Long redisOwner = portfolioOwnerRedisRepository.get(portfolioId);
 		if (!portfolioOwner.equals(redisOwner)) {
 			portfolioStateRedisRepository.setOwner(portfolioId, portfolioOwner);
 			fixes++;

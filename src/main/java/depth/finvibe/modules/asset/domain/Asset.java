@@ -53,7 +53,7 @@ public class Asset extends TimeStampedBaseEntity {
 
     private Long stockId;
 
-    private UUID userId;
+    private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @Setter(AccessLevel.PROTECTED)
@@ -73,7 +73,7 @@ public class Asset extends TimeStampedBaseEntity {
         this.valuation = AssetValuation.calculate(this.amount, this.totalPrice, currentPrice);
     }
 
-    public static Asset create(BigDecimal amount, BigDecimal unitPrice, Currency currency, String name, Long stockId, UUID userId) {
+    public static Asset create(BigDecimal amount, BigDecimal unitPrice, Currency currency, String name, Long stockId, Long userId) {
         Money totalPrice = Money.of(unitPrice.multiply(amount), currency);
         return Asset.builder()
             .amount(amount)

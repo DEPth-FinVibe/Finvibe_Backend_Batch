@@ -26,14 +26,14 @@ public interface MetricJpaRepository extends JpaRepository<UserMetric, UserMetri
             CollectPeriod collectPeriod,
             Pageable pageable);
 
-    Optional<UserMetric> findByUserIdAndTypeAndCollectPeriod(UUID userId, UserMetricType type, CollectPeriod collectPeriod);
+    Optional<UserMetric> findByUserIdAndTypeAndCollectPeriod(Long userId, UserMetricType type, CollectPeriod collectPeriod);
 
     List<UserMetric> findByUserIdAndCollectPeriodAndTypeIn(
-            UUID userId,
+            Long userId,
             CollectPeriod collectPeriod,
             List<UserMetricType> types);
 
-    List<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type);
+    List<UserMetric> findByUserIdAndType(Long userId, UserMetricType type);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
@@ -44,7 +44,7 @@ public interface MetricJpaRepository extends JpaRepository<UserMetric, UserMetri
               and metric.collectPeriod = :collectPeriod
             """)
     int updateValue(
-            @Param("userId") UUID userId,
+            @Param("userId") Long userId,
             @Param("type") UserMetricType type,
             @Param("collectPeriod") CollectPeriod collectPeriod,
             @Param("value") Double value);

@@ -23,7 +23,7 @@ public class XpDto {
     @Getter
     @Builder
     public static class Response {
-        private UUID userId;
+        private Long userId;
         private String nickname;
         private Long totalXp;
         private Integer level;
@@ -61,7 +61,7 @@ public class XpDto {
     @Getter
     @Builder
     public static class UserRankingResponse {
-        private UUID userId;
+        private Long userId;
         private String nickname;
         private Integer ranking;
         private Long currentXp;

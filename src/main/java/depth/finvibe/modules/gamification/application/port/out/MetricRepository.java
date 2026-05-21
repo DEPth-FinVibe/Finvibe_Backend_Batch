@@ -10,22 +10,22 @@ import depth.finvibe.modules.gamification.domain.enums.CollectPeriod;
 import depth.finvibe.modules.gamification.domain.enums.UserMetricType;
 
 public interface MetricRepository {
-    List<UUID> findUsersAchieved(UserMetricType metricType, CollectPeriod collectPeriod, Double targetValue);
+    List<Long> findUsersAchieved(UserMetricType metricType, CollectPeriod collectPeriod, Double targetValue);
 
-    List<UUID> findTopUsersByMetric(UserMetricType metricType, CollectPeriod collectPeriod, int limit);
+    List<Long> findTopUsersByMetric(UserMetricType metricType, CollectPeriod collectPeriod, int limit);
 
-    Optional<UserMetric> findByUserIdAndType(UUID userId, UserMetricType type, CollectPeriod collectPeriod);
+    Optional<UserMetric> findByUserIdAndType(Long userId, UserMetricType type, CollectPeriod collectPeriod);
 
     Map<UserMetricType, UserMetric> findByUserIdAndCollectPeriodAndTypes(
-            UUID userId,
+            Long userId,
             CollectPeriod collectPeriod,
             List<UserMetricType> metricTypes);
 
-    Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(UUID userId, UserMetricType metricType);
+    Map<CollectPeriod, UserMetric> findByUserIdAndTypeAcrossPeriods(Long userId, UserMetricType metricType);
 
     UserMetric save(UserMetric userMetric);
 
-    void upsertValue(UUID userId, UserMetricType metricType, CollectPeriod collectPeriod, double value);
+    void upsertValue(Long userId, UserMetricType metricType, CollectPeriod collectPeriod, double value);
 
     void deleteAllByCollectPeriod(CollectPeriod collectPeriod);
 }

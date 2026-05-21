@@ -20,7 +20,7 @@ public class UserService implements UserQueryUseCase {
     private final UserRepository userRepository;
 
     @Override
-    public String getNickname(UUID userId) {
+    public String getNickname(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new DomainException(UserErrorCode.USER_NOT_FOUND));
         return user.getPersonalDetails().getNickname();

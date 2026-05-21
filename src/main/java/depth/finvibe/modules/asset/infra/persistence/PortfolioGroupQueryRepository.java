@@ -2,8 +2,6 @@ package depth.finvibe.modules.asset.infra.persistence;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
-
 import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
@@ -101,7 +99,7 @@ public class PortfolioGroupQueryRepository {
 
     public record PortfolioAssetRow(
             Long portfolioId,
-            UUID userId,
+            Long userId,
             Long stockId,
             BigDecimal amount,
             BigDecimal purchasePriceAmount,

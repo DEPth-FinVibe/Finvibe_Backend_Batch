@@ -14,8 +14,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository;
+import depth.finvibe.modules.asset.infra.persistence.PortfolioGroupQueryRepository.PortfolioAssetRow;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.PortfolioAssetSnapshotRedisRepository.AssetSnapshot;
+import depth.finvibe.modules.asset.infra.redis.PortfolioOwnerRedisRepository;
+import depth.finvibe.modules.asset.infra.redis.PortfolioStateRedisRepository;
 import depth.finvibe.modules.asset.infra.redis.StockHoldingIndexRedisRepository;
 
 /**
@@ -32,6 +35,7 @@ public class RedisIndexReconciliationScheduler {
 	private final PortfolioGroupQueryRepository portfolioGroupQueryRepository;
 	private final StockHoldingIndexRedisRepository stockHoldingIndexRedisRepository;
 	private final PortfolioAssetSnapshotRedisRepository portfolioAssetSnapshotRedisRepository;
+	private final PortfolioOwnerRedisRepository portfolioOwnerRedisRepository;
 	private final PortfolioStateRedisRepository portfolioStateRedisRepository;
 	private final MeterRegistry meterRegistry;
 	private final ValuationRedisExclusiveLock valuationRedisExclusiveLock;
@@ -115,8 +119,7 @@ public class RedisIndexReconciliationScheduler {
 
 	private int reconcilePortfolio(Long portfolioId, List<PortfolioAssetRow> rows, Map<Long, Set<Long>> dbStockToPortfolios) {
 		int fixes = 0;
-		Long portfolioId = portfolio.getId();
-		Long portfolioOwner = portfolio.getUserId();
+		Long portfolioOwner = rows.get(0).userId();
 		if (portfolioOwner == null) {
 			log.warn("Skip Redis index reconciliation for portfolio with null userId. portfolioId={}", portfolioId);
 			return fixes;

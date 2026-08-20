@@ -15,6 +15,8 @@ public interface TradingDayRepository {
    */
   Optional<LocalDate> findLastOpenDayOnOrBefore(LocalDate date);
 
+  Optional<Boolean> findOpenDay(LocalDate date);
+
   /**
    * 해당 연월에 저장된 거래일 레코드 수.
    */

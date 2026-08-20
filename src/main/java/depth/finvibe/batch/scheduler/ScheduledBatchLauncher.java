@@ -35,8 +35,10 @@ public class ScheduledBatchLauncher {
 	private final Job syncLatestNewsJob;
 	@Qualifier("syncDiscussionCountsJob")
 	private final Job syncDiscussionCountsJob;
-	@Qualifier("cleanupClosingPriceOnMarketOpenJob")
-	private final Job cleanupClosingPriceOnMarketOpenJob;
+	@Qualifier("cleanupExpiredClosingPricesJob")
+	private final Job cleanupExpiredClosingPricesJob;
+	@Qualifier("warmUpClosingPricesJob")
+	private final Job warmUpClosingPricesJob;
 	@Qualifier("executeBatchPriceUpdateJob")
 	private final Job executeBatchPriceUpdateJob;
 	@Qualifier("cacheIndexMinuteCandlesJob")
@@ -102,10 +104,16 @@ public class ScheduledBatchLauncher {
 		scheduledBatchJobSupport.launch(syncDiscussionCountsJob);
 	}
 
-	@Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
-	@SchedulerLock(name = "closingPriceCleanup", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
-	public void cleanupClosingPriceOnMarketOpen() {
-		scheduledBatchJobSupport.launch(cleanupClosingPriceOnMarketOpenJob);
+	@Scheduled(cron = "${market.closing-price.cleanup.cron:0 30 16 * * *}", zone = "Asia/Seoul")
+	@SchedulerLock(name = "closingPriceCleanup", lockAtMostFor = "PT10M", lockAtLeastFor = "PT5S")
+	public void cleanupExpiredClosingPrices() {
+		scheduledBatchJobSupport.launch(cleanupExpiredClosingPricesJob);
+	}
+
+	@Scheduled(cron = "${market.closing-price.warm-up.cron:0 40 15 * * MON-FRI}", zone = "Asia/Seoul")
+	@SchedulerLock(name = "closingPriceWarmUp", lockAtMostFor = "PT2H", lockAtLeastFor = "PT10S")
+	public void warmUpClosingPrices() {
+		scheduledBatchJobSupport.launch(warmUpClosingPricesJob);
 	}
 
 	@Scheduled(cron = "0 0 * * * *")

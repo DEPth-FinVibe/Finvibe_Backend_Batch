@@ -1,6 +1,7 @@
 package depth.finvibe.modules.market.application;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -10,12 +11,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 
 import depth.finvibe.modules.market.application.port.out.ChkHolidayClient;
 import depth.finvibe.modules.market.application.port.out.TradingDayRepository;
 import depth.finvibe.modules.market.domain.HolidayDayInfo;
+import depth.finvibe.modules.market.domain.MarketHours;
 import depth.finvibe.modules.market.domain.TradingDay;
+import depth.finvibe.modules.market.domain.enums.TradingDayStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,6 +33,23 @@ public class HolidayCalendarService {
 
   private final TradingDayRepository tradingDayRepository;
   private final ChkHolidayClient chkHolidayClient;
+  private final MeterRegistry meterRegistry;
+
+  public TradingDayStatus getTradingDayStatus(LocalDate date) {
+    Optional<Boolean> saved = tradingDayRepository.findOpenDay(date);
+    if (saved.isPresent()) {
+      return saved.get() ? TradingDayStatus.OPEN : TradingDayStatus.CLOSED;
+    }
+
+    ensureCalendarForMonth(YearMonth.from(date));
+    return tradingDayRepository.findOpenDay(date)
+        .map(openDay -> openDay ? TradingDayStatus.OPEN : TradingDayStatus.CLOSED)
+        .orElseGet(() -> {
+          meterRegistry.counter("market.calendar.status.unknown").increment();
+          log.error("휴장일 달력으로 거래 여부를 판정할 수 없습니다. date={}", date);
+          return TradingDayStatus.UNKNOWN;
+        });
+  }
 
   /**
    * 해당 일 이하 중 가장 최근 개장일을 반환.
@@ -50,12 +71,19 @@ public class HolidayCalendarService {
     return last;
   }
 
+  public Optional<LocalDate> getLastCompletedTradingDay(LocalDateTime dateTime) {
+    LocalDate candidateDate = MarketHours.isSessionCompletedAt(dateTime.toLocalTime())
+        ? dateTime.toLocalDate()
+        : dateTime.toLocalDate().minusDays(1);
+    return getLastTradingDayOnOrBefore(candidateDate);
+  }
+
   /**
    * 해당 연월의 휴장일 달력이 DB에 없으면 KIS 국내휴장일조회로 적재.
    */
-  public void ensureCalendarForMonth(YearMonth yearMonth) {
+  public boolean ensureCalendarForMonth(YearMonth yearMonth) {
     if (isCalendarComplete(yearMonth)) {
-      return;
+      return true;
     }
     try {
       List<HolidayDayInfo> infos = chkHolidayClient.fetchChkHoliday(yearMonth);
@@ -91,8 +119,11 @@ public class HolidayCalendarService {
             yearMonth.lengthOfMonth(),
             actualCount);
       }
+      return isCalendarComplete(yearMonth);
     } catch (Exception e) {
+      meterRegistry.counter("market.calendar.sync.failures").increment();
       log.warn("휴장일 조회 실패. yearMonth={}", yearMonth, e);
+      return false;
     }
   }
 

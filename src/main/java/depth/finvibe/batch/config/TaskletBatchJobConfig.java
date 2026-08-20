@@ -20,6 +20,7 @@ import depth.finvibe.modules.asset.infra.scheduler.ValuationWriteBackScheduler;
 import depth.finvibe.modules.gamification.infra.scheduler.GamificationScheduler;
 import depth.finvibe.modules.market.infra.scheduler.BatchPriceUpdateScheduler;
 import depth.finvibe.modules.market.infra.scheduler.ClosingPriceCleanupScheduler;
+import depth.finvibe.modules.market.infra.scheduler.ClosingPriceWarmUpScheduler;
 import depth.finvibe.modules.market.infra.scheduler.HolidayCalendarScheduler;
 import depth.finvibe.modules.market.infra.scheduler.IndexMinuteCandleCacheScheduler;
 import depth.finvibe.modules.market.infra.scheduler.StockBulkUpsertScheduler;
@@ -128,16 +129,31 @@ public class TaskletBatchJobConfig {
 	}
 
 	@Bean
-	Job cleanupClosingPriceOnMarketOpenJob(
+	Job cleanupExpiredClosingPricesJob(
 		JobRepository jobRepository,
 		PlatformTransactionManager transactionManager,
 		ClosingPriceCleanupScheduler closingPriceCleanupScheduler
 	) {
 		return taskletJob(
-			"cleanupClosingPriceOnMarketOpenJob",
+			"cleanupExpiredClosingPricesJob",
 			jobRepository,
 			transactionManager,
-			closingPriceCleanupScheduler::cleanupClosingPriceOnMarketOpen
+			closingPriceCleanupScheduler::cleanupExpiredClosingPrices
+		);
+	}
+
+	@Bean
+	Job warmUpClosingPricesJob(
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		ClosingPriceWarmUpScheduler closingPriceWarmUpScheduler
+	) {
+		return taskletJob(
+			"warmUpClosingPricesJob",
+			jobRepository,
+			transactionManager,
+			closingPriceWarmUpScheduler::warmUpClosingPrices,
+			false
 		);
 	}
 

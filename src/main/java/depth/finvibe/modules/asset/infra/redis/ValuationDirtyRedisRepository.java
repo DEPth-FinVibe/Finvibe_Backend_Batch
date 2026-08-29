@@ -86,6 +86,21 @@ public class ValuationDirtyRedisRepository implements ValuationDirtyRepository {
         }
     }
 
+    @Override
+    public long countPortfolioValuationDirty() {
+        return setSize(PORTFOLIO_VALUATION_DIRTY_KEY);
+    }
+
+    @Override
+    public long countUserValuationDirty() {
+        return setSize(USER_VALUATION_DIRTY_KEY);
+    }
+
+    @Override
+    public long countPortfolioValuationDeletionDirty() {
+        return setSize(PORTFOLIO_VALUATION_DELETION_DIRTY_KEY);
+    }
+
     private List<String> scanSet(String key, int limit) {
         if (limit <= 0) {
             return List.of();
@@ -106,6 +121,11 @@ public class ValuationDirtyRedisRepository implements ValuationDirtyRepository {
             return;
         }
         redisTemplate.opsForSet().add(key, values.toArray(String[]::new));
+    }
+
+    private long setSize(String key) {
+        Long size = redisTemplate.opsForSet().size(key);
+        return size == null ? 0L : size;
     }
 
     private List<Long> parseLong(String value) {

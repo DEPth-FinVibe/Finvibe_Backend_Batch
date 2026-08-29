@@ -18,4 +18,10 @@ public interface ValuationDirtyRepository {
     void removeUserValuationDirty(String userId);
 
     void removePortfolioValuationDeletionDirty(Long portfolioId);
+
+    long countPortfolioValuationDirty();
+
+    long countUserValuationDirty();
+
+    long countPortfolioValuationDeletionDirty();
 }

@@ -23,6 +23,7 @@ import depth.finvibe.modules.market.infra.scheduler.ClosingPriceCleanupScheduler
 import depth.finvibe.modules.market.infra.scheduler.ClosingPriceWarmUpScheduler;
 import depth.finvibe.modules.market.infra.scheduler.HolidayCalendarScheduler;
 import depth.finvibe.modules.market.infra.scheduler.IndexMinuteCandleCacheScheduler;
+import depth.finvibe.modules.market.infra.scheduler.RankingCandleWarmUpScheduler;
 import depth.finvibe.modules.market.infra.scheduler.StockBulkUpsertScheduler;
 import depth.finvibe.modules.market.infra.scheduler.StockRankingUpdateScheduler;
 import depth.finvibe.modules.news.infra.scheduler.NewsModuleScheduler;
@@ -213,6 +214,21 @@ public class TaskletBatchJobConfig {
 			jobRepository,
 			transactionManager,
 			stockRankingUpdateScheduler::executeStockRankingUpdate,
+			false
+		);
+	}
+
+	@Bean
+	Job warmUpRankingCandlesJob(
+		JobRepository jobRepository,
+		PlatformTransactionManager transactionManager,
+		RankingCandleWarmUpScheduler rankingCandleWarmUpScheduler
+	) {
+		return taskletJob(
+			"warmUpRankingCandlesJob",
+			jobRepository,
+			transactionManager,
+			rankingCandleWarmUpScheduler::warmUpHomeRankingCandles,
 			false
 		);
 	}

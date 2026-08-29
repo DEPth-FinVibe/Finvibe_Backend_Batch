@@ -47,6 +47,8 @@ public class ScheduledBatchLauncher {
 	private final Job ensureNextMonthHolidayCalendarJob;
 	@Qualifier("executeStockRankingUpdateJob")
 	private final Job executeStockRankingUpdateJob;
+	@Qualifier("warmUpRankingCandlesJob")
+	private final Job warmUpRankingCandlesJob;
 	@Qualifier("executeStockBulkUpsertJob")
 	private final Job executeStockBulkUpsertJob;
 	@Qualifier("rewardWeeklyTopOnePercentBadgeJob")
@@ -138,6 +140,13 @@ public class ScheduledBatchLauncher {
 	@SchedulerLock(name = "stockRankingUpdate", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
 	public void executeStockRankingUpdate() {
 		launchAfterStartupWarmUp(executeStockRankingUpdateJob);
+	}
+
+	// 랭킹 갱신 직후에 돌아 홈 화면이 참조할 상위 종목 일봉을 미리 채운다.
+	@Scheduled(cron = "${market.candle.warmup.cron:0 3/10 * * * *}", zone = "Asia/Seoul")
+	@SchedulerLock(name = "rankingCandleWarmUp", lockAtMostFor = "PT9M", lockAtLeastFor = "PT5S")
+	public void warmUpRankingCandles() {
+		launchAfterStartupWarmUp(warmUpRankingCandlesJob);
 	}
 
 	@Scheduled(cron = "0 0 2 * * *")

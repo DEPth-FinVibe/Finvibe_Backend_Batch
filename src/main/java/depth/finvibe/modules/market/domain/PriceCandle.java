@@ -92,6 +92,28 @@ public class PriceCandle {
                 .build();
     }
 
+    /**
+     * 결측으로 표시했던 슬롯에 실제 데이터가 도착했거나, 확정 값으로 보정할 때 사용한다.
+     */
+    public void restore(
+            BigDecimal open,
+            BigDecimal high,
+            BigDecimal low,
+            BigDecimal close,
+            BigDecimal prevDayChangePct,
+            BigDecimal volume,
+            BigDecimal value
+    ) {
+        this.isMissing = false;
+        this.open = open;
+        this.high = high;
+        this.low = low;
+        this.close = close;
+        this.prevDayChangePct = prevDayChangePct;
+        this.volume = volume;
+        this.value = value;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

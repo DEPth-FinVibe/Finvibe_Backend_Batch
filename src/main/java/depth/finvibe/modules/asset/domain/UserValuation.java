@@ -75,6 +75,6 @@ public class UserValuation {
     }
 
     private boolean isNewerThanCurrent(Instant newUpdatedAt) {
-        return this.updatedAt == null || newUpdatedAt == null || newUpdatedAt.isAfter(this.updatedAt);
+        return newUpdatedAt != null && (this.updatedAt == null || newUpdatedAt.isAfter(this.updatedAt));
     }
 }

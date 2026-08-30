@@ -2,6 +2,7 @@ package depth.finvibe.modules.asset.application;
 
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,8 +49,7 @@ class ValuationWriteBackServiceTest {
         service = new ValuationWriteBackService(
             valuationDirtyRepository,
             valuationSnapshotRepository,
-            portfolioValuationRepository,
-            userValuationRepository,
+            new ValuationWriteBackTransaction(portfolioValuationRepository, userValuationRepository),
             new SimpleMeterRegistry()
         );
         ReflectionTestUtils.setField(service, "portfolioBatchSize", BATCH_SIZE);
@@ -168,5 +168,57 @@ class ValuationWriteBackServiceTest {
         verify(valuationSnapshotRepository, never()).readPortfolioSnapshot(1L);
         verify(portfolioValuationRepository, never()).upsertIfNewer(org.mockito.ArgumentMatchers.any());
         verify(valuationDirtyRepository, never()).removePortfolioValuationDirty(1L);
+    }
+
+    @Test
+    void drainsMultipleFullPortfolioChunksWithinOneRun() {
+        ReflectionTestUtils.setField(service, "portfolioBatchSize", 2);
+        PortfolioValuationSnapshot first = portfolioSnapshot(1L);
+        PortfolioValuationSnapshot second = portfolioSnapshot(2L);
+        PortfolioValuationSnapshot third = portfolioSnapshot(3L);
+        when(valuationDirtyRepository.scanPortfolioValuationDeletionDirty(BATCH_SIZE)).thenReturn(List.of());
+        when(valuationDirtyRepository.scanPortfolioValuationDirty(2))
+            .thenReturn(List.of(1L, 2L), List.of(3L));
+        when(valuationSnapshotRepository.readPortfolioSnapshot(1L)).thenReturn(Optional.of(first));
+        when(valuationSnapshotRepository.readPortfolioSnapshot(2L)).thenReturn(Optional.of(second));
+        when(valuationSnapshotRepository.readPortfolioSnapshot(3L)).thenReturn(Optional.of(third));
+        when(valuationDirtyRepository.scanUserValuationDirty(BATCH_SIZE)).thenReturn(List.of());
+
+        service.runWriteBackBatch();
+
+        verify(valuationDirtyRepository, times(2)).scanPortfolioValuationDirty(2);
+        verify(valuationDirtyRepository).removePortfolioValuationDirty(1L);
+        verify(valuationDirtyRepository).removePortfolioValuationDirty(2L);
+        verify(valuationDirtyRepository).removePortfolioValuationDirty(3L);
+    }
+
+    @Test
+    void keepsWholePortfolioChunkDirtyWhenOneUpsertFails() {
+        PortfolioValuationSnapshot first = portfolioSnapshot(1L);
+        PortfolioValuationSnapshot second = portfolioSnapshot(2L);
+        when(valuationDirtyRepository.scanPortfolioValuationDeletionDirty(BATCH_SIZE)).thenReturn(List.of());
+        when(valuationDirtyRepository.scanPortfolioValuationDirty(BATCH_SIZE)).thenReturn(List.of(1L, 2L));
+        when(valuationSnapshotRepository.readPortfolioSnapshot(1L)).thenReturn(Optional.of(first));
+        when(valuationSnapshotRepository.readPortfolioSnapshot(2L)).thenReturn(Optional.of(second));
+        when(valuationDirtyRepository.scanUserValuationDirty(BATCH_SIZE)).thenReturn(List.of());
+        org.mockito.Mockito.doThrow(new IllegalStateException("db down"))
+            .when(portfolioValuationRepository)
+            .upsertIfNewer(second);
+
+        service.runWriteBackBatch();
+
+        verify(valuationDirtyRepository, never()).removePortfolioValuationDirty(1L);
+        verify(valuationDirtyRepository, never()).removePortfolioValuationDirty(2L);
+    }
+
+    private PortfolioValuationSnapshot portfolioSnapshot(Long portfolioId) {
+        return new PortfolioValuationSnapshot(
+            portfolioId,
+            1000L,
+            1200L,
+            20.0,
+            3L,
+            Instant.parse("2026-05-14T00:01:00Z")
+        );
     }
 }

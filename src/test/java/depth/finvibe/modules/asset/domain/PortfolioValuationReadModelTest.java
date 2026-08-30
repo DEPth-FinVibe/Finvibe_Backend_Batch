@@ -49,4 +49,21 @@ class PortfolioValuationReadModelTest {
         assertThat(valuation.getCurrentValue()).isEqualTo(1100L);
         assertThat(valuation.getProfitRate()).isEqualTo(10.0);
     }
+
+    @Test
+    void ignoresDeletionOlderThanLatestValuation() {
+        PortfolioValuationReadModel valuation = PortfolioValuationReadModel.create(
+            1L,
+            1000L,
+            1100L,
+            10.0,
+            1L,
+            Instant.parse("2026-05-14T00:01:00Z")
+        );
+
+        valuation.softDeleteIfNewer(Instant.parse("2026-05-14T00:00:59Z"));
+
+        assertThat(valuation.isDeleted()).isFalse();
+        assertThat(valuation.getDeletedAt()).isNull();
+    }
 }

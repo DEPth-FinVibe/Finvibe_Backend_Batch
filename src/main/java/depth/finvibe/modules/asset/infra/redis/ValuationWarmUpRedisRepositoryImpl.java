@@ -57,8 +57,10 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         connection.keyCommands().del(bytes(legacyPortfolioAssetsKey(state.portfolioId())));
         connection.keyCommands().del(bytes(portfolioStocksKey(state.portfolioId())));
         hSet(connection, portfolioHashKey(state.portfolioId()), "u", state.userId());
+        connection.hashCommands().hDel(bytes(portfolioHashKey(state.portfolioId())), bytes("ucp"));
         hSet(connection, portfolioHashKey(state.portfolioId()), "pv", state.purchasedValue());
         hSet(connection, portfolioHashKey(state.portfolioId()), "cv", state.currentValue());
+        hSet(connection, portfolioHashKey(state.portfolioId()), "cvp", state.currentValue());
         hSet(connection, portfolioHashKey(state.portfolioId()), "pr", state.profitRate());
         hSet(connection, portfolioHashKey(state.portfolioId()), "ac", state.assetCount());
         hSet(connection, portfolioHashKey(state.portfolioId()), "del", "0");
@@ -87,6 +89,7 @@ public class ValuationWarmUpRedisRepositoryImpl implements ValuationWarmUpRedisR
         }
         hSet(connection, userHashKey(state.userId()), "pv", state.purchasedValue());
         hSet(connection, userHashKey(state.userId()), "cv", state.currentValue());
+        hSet(connection, userHashKey(state.userId()), "cvp", state.currentValue());
         hSet(connection, userHashKey(state.userId()), "pr", state.profitRate());
         hSet(connection, userHashKey(state.userId()), "pc", state.portfolioCount());
         hSet(connection, userHashKey(state.userId()), "ua", state.updatedAt().toString());
